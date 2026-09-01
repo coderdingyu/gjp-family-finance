@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gjp-server
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/gjp?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: ''
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: always
+
+mybatis:
+  configuration:
+    # 数据库 record_date 这类下划线字段自动映射到 Java 的 recordDate
+    map-underscore-to-camel-case: true
+    # 开发期打印 SQL，方便排查统计口径问题；验收演示时可改成 NoLoggingImpl
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  type-aliases-package: com.gjp.entity
+
+logging:
+  level:
+    com.gjp: debug
