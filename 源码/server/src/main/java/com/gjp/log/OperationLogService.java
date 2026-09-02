@@ -171,7 +171,7 @@ public class OperationLogService {
     /**
      * 分页查询日志。范围按角色自动收敛，前端传的 userId 只对户主和管理员有效。
      */
-    public PageResult<OperationLog> page(LogQuery q) {
+    public PageResult<?> page(LogQuery q) {
         if (q.getPageNum() == null || q.getPageNum() < 1) {
             q.setPageNum(1);
         }
@@ -204,26 +204,10 @@ public class OperationLogService {
                 q.getSuccess(), keyword, q.getStartTime(), q.getEndTime(),
                 offset, q.getPageSize());
         if (role == Role.ADMIN) {
-            redactAmounts(list);
+            List<AdminLogDTO> adminList = list.stream().map(AdminLogDTO::from).toList();
+            return new PageResult<>(total, adminList);
         }
         return new PageResult<>(total, list);
-    }
-
-    /**
-     * 管理员不能看到账单金额。摘要里的「88.88 元」统一打码，detail 里可能带金额 JSON，直接去掉。
-     */
-    private void redactAmounts(List<OperationLog> list) {
-        for (OperationLog log : list) {
-            log.setSummary(maskAmounts(log.getSummary()));
-            log.setDetail(null);
-        }
-    }
-
-    private String maskAmounts(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
-        }
-        return text.replaceAll("\\d+(?:\\.\\d+)?\\s*元", "*** 元");
     }
 
     /** 日志按模块的分布，日志页顶部的小统计 */
