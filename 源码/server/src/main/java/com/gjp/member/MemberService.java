@@ -220,6 +220,21 @@ public class MemberService {
                 (status == 1 ? "启用" : "禁用") + "账号 " + target.getUsername());
     }
 
+    /**
+     * 删除普通成员账号，解除与家庭成员的绑定。
+     * 只禁用不解绑的话，成员永远删不掉（delete 会因 countByMemberId>0 拒绝）。
+     */
+    public void deleteAccount(Long userId) {
+        UserContext.requireOwner();
+        User target = mustBeSameFamily(userId);
+        if (target.getId().equals(UserContext.getUserId())) {
+            throw new BizException("不能删除自己的账号");
+        }
+        userMapper.deleteById(userId);
+        logService.record(OperationLogService.M_MEMBER, OperationLogService.A_DELETE, userId,
+                "删除账号 " + target.getUsername() + "，已解除与成员的绑定");
+    }
+
     private User mustBeSameFamily(Long userId) {
         User target = userMapper.selectById(userId);
         if (target == null || !UserContext.getFamilyId().equals(target.getFamilyId())) {

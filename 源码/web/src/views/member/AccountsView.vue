@@ -35,7 +35,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" min-width="170" />
-        <el-table-column label="操作" width="190" align="center" fixed="right">
+        <el-table-column label="操作" width="240" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="row.role === 1">
               <span class="text-light">户主账号不可操作</span>
@@ -50,6 +50,7 @@
               >
                 {{ row.status === 1 ? '禁用' : '启用' }}
               </el-button>
+              <el-button link type="danger" size="small" @click="onDelete(row)">删除账号</el-button>
             </template>
           </template>
         </el-table-column>
@@ -124,7 +125,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import {
-  createAccount, listAccounts, listMember, resetAccountPassword, toggleAccountStatus
+  createAccount, deleteAccount, listAccounts, listMember, resetAccountPassword, toggleAccountStatus
 } from '../../api/member'
 import { money } from '../../utils/format'
 
@@ -228,6 +229,17 @@ async function onToggle(row) {
   )
   await toggleAccountStatus(row.id, next)
   ElMessage.success(next === 1 ? '已启用' : '已禁用')
+  await load()
+}
+
+async function onDelete(row) {
+  await ElMessageBox.confirm(
+    `确认删除账号【${row.username}】？删除后该成员将无法登录，成员档案仍保留，需要时可重新开通。`,
+    '删除账号',
+    { type: 'warning' }
+  )
+  await deleteAccount(row.id)
+  ElMessage.success('账号已删除')
   await load()
 }
 </script>

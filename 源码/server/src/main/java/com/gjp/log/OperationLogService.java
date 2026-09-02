@@ -1,6 +1,7 @@
 package com.gjp.log;
 
 import com.gjp.common.BizException;
+import com.gjp.common.LikeEscape;
 import com.gjp.common.PageResult;
 import com.gjp.common.Role;
 import com.gjp.common.UserContext;
@@ -195,13 +196,34 @@ public class OperationLogService {
             userId = UserContext.getUserId();
         }
 
+        String keyword = LikeEscape.of(q.getKeyword());
         long total = logMapper.countByQuery(familyId, userId, q.getModule(), q.getAction(),
-                q.getSuccess(), q.getKeyword(), q.getStartTime(), q.getEndTime());
+                q.getSuccess(), keyword, q.getStartTime(), q.getEndTime());
         List<OperationLog> list = total == 0 ? List.of()
                 : logMapper.selectByQuery(familyId, userId, q.getModule(), q.getAction(),
-                q.getSuccess(), q.getKeyword(), q.getStartTime(), q.getEndTime(),
+                q.getSuccess(), keyword, q.getStartTime(), q.getEndTime(),
                 offset, q.getPageSize());
+        if (role == Role.ADMIN) {
+            redactAmounts(list);
+        }
         return new PageResult<>(total, list);
+    }
+
+    /**
+     * 管理员不能看到账单金额。摘要里的「88.88 元」统一打码，detail 里可能带金额 JSON，直接去掉。
+     */
+    private void redactAmounts(List<OperationLog> list) {
+        for (OperationLog log : list) {
+            log.setSummary(maskAmounts(log.getSummary()));
+            log.setDetail(null);
+        }
+    }
+
+    private String maskAmounts(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        return text.replaceAll("\\d+(?:\\.\\d+)?\\s*元", "*** 元");
     }
 
     /** 日志按模块的分布，日志页顶部的小统计 */

@@ -107,6 +107,23 @@ public interface StatMapper {
                                            @Param("endDate") LocalDate endDate,
                                            @Param("memberId") Long memberId);
 
+    /**
+     * 直接挂在该分类上、没有落到子分类的流水。
+     * 旧数据或“先记账再拆下级”时会出现这种情况，钻取时要单独列成「未细分」，
+     * 否则饼图点进去会少一块钱。
+     */
+    @Select("<script>SELECT c.id AS id, CONCAT(c.category_name, '（未细分）') AS name, "
+            + "       COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count "
+            + "FROM t_record r "
+            + "JOIN t_category c ON r.category_id = c.id "
+            + "WHERE r.family_id = #{familyId} AND c.id = #{parentId} "
+            + "AND r.record_date BETWEEN #{startDate} AND #{endDate} " + MEMBER_COND
+            + " GROUP BY c.id, c.category_name</script>")
+    List<AmountItem> selectDirectCategoryStat(@Param("familyId") Long familyId, @Param("parentId") Long parentId,
+                                              @Param("startDate") LocalDate startDate,
+                                              @Param("endDate") LocalDate endDate,
+                                              @Param("memberId") Long memberId);
+
     /** 按家庭成员汇总，成员收支对比柱状图数据源。这个查询本身就是分成员的，不再叠加 memberId 过滤 */
     @Select("<script>SELECT m.id AS id, m.member_name AS name, "
             + "       COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count "

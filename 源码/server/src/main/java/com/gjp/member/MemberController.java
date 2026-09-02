@@ -31,6 +31,12 @@ public class MemberController {
         return Result.ok(memberService.list());
     }
 
+    /** 本家庭的账号列表。字面路径必须写在 /{id} 前面，避免被当成成员 ID */
+    @GetMapping("/accounts")
+    public Result<List<User>> accounts() {
+        return Result.ok(memberService.accounts());
+    }
+
     @GetMapping("/{id}")
     public Result<Member> detail(@PathVariable Long id) {
         return Result.ok(memberService.detail(id));
@@ -54,12 +60,6 @@ public class MemberController {
 
     // ---------------- 成员登录账号 ----------------
 
-    /** 本家庭的账号列表 */
-    @GetMapping("/accounts")
-    public Result<List<User>> accounts() {
-        return Result.ok(memberService.accounts());
-    }
-
     /** 为成员开通登录账号，body: {username, password} */
     @PostMapping("/{id}/account")
     public Result<User> createAccount(@PathVariable Long id, @RequestBody Map<String, String> body) {
@@ -77,6 +77,13 @@ public class MemberController {
     @PutMapping("/account/{userId}/status")
     public Result<Void> toggleStatus(@PathVariable Long userId, @RequestBody Map<String, Integer> body) {
         memberService.toggleStatus(userId, body.get("status"));
+        return Result.ok();
+    }
+
+    /** 删除普通成员账号，解除绑定后才允许删除该成员 */
+    @DeleteMapping("/account/{userId}")
+    public Result<Void> deleteAccount(@PathVariable Long userId) {
+        memberService.deleteAccount(userId);
         return Result.ok();
     }
 }

@@ -1,6 +1,7 @@
 package com.gjp.mapper;
 
 import com.gjp.entity.User;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
@@ -52,8 +53,9 @@ public interface UserMapper {
             + "LEFT JOIN t_member m ON u.member_id = m.id "
             + "LEFT JOIN t_family f ON u.family_id = f.id "
             + "<where>"
-            + " <if test='keyword != null and keyword != \"\"'> AND (u.username LIKE CONCAT('%', #{keyword}, '%') "
-            + "     OR u.real_name LIKE CONCAT('%', #{keyword}, '%') OR f.family_name LIKE CONCAT('%', #{keyword}, '%')) </if>"
+            + " <if test='keyword != null and keyword != \"\"'> AND (u.username LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\' "
+            + "     OR u.real_name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\' "
+            + "     OR f.family_name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\') </if>"
             + " <if test='role != null'> AND u.role = #{role} </if>"
             + "</where>"
             + " ORDER BY u.family_id, u.role DESC, u.id"
@@ -70,4 +72,7 @@ public interface UserMapper {
     @Select("<script>SELECT COUNT(*) FROM t_user WHERE member_id = #{memberId} "
             + "<if test='excludeUserId != null'> AND id <![CDATA[<>]]> #{excludeUserId} </if></script>")
     int countByMemberId(@Param("memberId") Long memberId, @Param("excludeUserId") Long excludeUserId);
+
+    @Delete("DELETE FROM t_user WHERE id = #{id}")
+    int deleteById(@Param("id") Long id);
 }

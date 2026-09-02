@@ -13,3 +13,4 @@ export const resetAccountPassword = (userId, password) =>
   request.put(`/member/account/${userId}/password`, { password })
 export const toggleAccountStatus = (userId, status) =>
   request.put(`/member/account/${userId}/status`, { status })
+export const deleteAccount = (userId) => request.delete(`/member/account/${userId}`)

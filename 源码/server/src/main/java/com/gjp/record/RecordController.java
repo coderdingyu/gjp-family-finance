@@ -25,6 +25,12 @@ public class RecordController {
     @Autowired
     private RecordService recordService;
 
+    /** 录入页需要的候选项：历史商家、历史片区、支付方式 */
+    @GetMapping("/options")
+    public Result<Map<String, Object>> options() {
+        return Result.ok(recordService.options());
+    }
+
     /** 多条件分页查询，返回 {page:{total,list}, sumIncome, sumExpense} */
     @PostMapping("/page")
     public Result<Map<String, Object>> page(@RequestBody RecordQuery query) {
@@ -56,11 +62,5 @@ public class RecordController {
     @DeleteMapping("/batch")
     public Result<Integer> deleteBatch(@RequestBody List<Long> ids) {
         return Result.ok(recordService.deleteBatch(ids));
-    }
-
-    /** 录入页需要的候选项：历史商家、历史片区、支付方式 */
-    @GetMapping("/options")
-    public Result<Map<String, Object>> options() {
-        return Result.ok(recordService.options());
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -63,12 +65,9 @@ public class DedupService {
 
         // ---- 并查集：把配对合并成组 ----
         Map<Long, Long> parent = new HashMap<>();
-        Map<String, Integer> pairDayDiff = new HashMap<>();
         for (Map<String, Object> pair : pairs) {
             Long a = ((Number) pair.get("idA")).longValue();
             Long b = ((Number) pair.get("idB")).longValue();
-            int diff = ((Number) pair.get("dayDiff")).intValue();
-            pairDayDiff.put(a + "-" + b, diff);
             union(parent, a, b);
         }
 
@@ -98,15 +97,12 @@ public class DedupService {
             // 按日期升序，用户看起来更自然
             records.sort(Comparator.comparing(Record::getRecordDate).thenComparing(Record::getId));
 
-            int maxDiff = 0;
-            for (int i = 0; i < ids.size(); i++) {
-                for (int j = i + 1; j < ids.size(); j++) {
-                    Integer d = pairDayDiff.get(ids.get(i) + "-" + ids.get(j));
-                    if (d != null) {
-                        maxDiff = Math.max(maxDiff, d);
-                    }
-                }
-            }
+            // 组内跨度用首末日差，不能用两两配对的最大日差：
+            // A–B 差 2 天、B–C 差 2 天合并后，组跨度是 4 天，理由必须和日期区间一致
+            LocalDate firstDate = records.get(0).getRecordDate();
+            LocalDate lastDate = records.get(records.size() - 1).getRecordDate();
+            int maxDiff = (firstDate == null || lastDate == null)
+                    ? 0 : (int) ChronoUnit.DAYS.between(firstDate, lastDate);
 
             DuplicateGroup g = new DuplicateGroup();
             g.setAmount(records.get(0).getAmount());

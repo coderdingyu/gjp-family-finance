@@ -1,6 +1,7 @@
 package com.gjp.record;
 
 import com.gjp.common.BizException;
+import com.gjp.common.LikeEscape;
 import com.gjp.common.PageResult;
 import com.gjp.common.UserContext;
 import com.gjp.entity.Category;
@@ -87,15 +88,8 @@ public class RecordService {
                 && q.getMinAmount().compareTo(q.getMaxAmount()) > 0) {
             throw new BizException("金额下限不能大于上限");
         }
-        if (q.getKeyword() != null && !q.getKeyword().isBlank()) {
-            q.setKeyword(escapeLike(q.getKeyword().trim()));
-        }
+        q.setKeyword(LikeEscape.of(q.getKeyword()));
         q.setOffset((q.getPageNum() - 1) * q.getPageSize());
-    }
-
-    /** 把用户输入的 % _ \ 当成字面量，避免 keyword='%' 变成查全部 */
-    private String escapeLike(String keyword) {
-        return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     public Record detail(Long id) {
@@ -198,6 +192,7 @@ public class RecordService {
 
     /** 录入过的商家和片区，前端用来做输入联想，减少"海底捞/海底捞火锅"这类同店不同名 */
     public Map<String, Object> options() {
+        UserContext.requireFamilyMember();
         Long familyId = UserContext.getFamilyId();
         Map<String, Object> map = new HashMap<>();
         map.put("merchants", recordMapper.selectMerchants(familyId));

@@ -111,8 +111,21 @@ public class StatService {
 
     /** 子分类构成（点击饼图某一块后的钻取，支持一级→二级→三级逐层下钻） */
     public List<AmountItem> subCategoryStat(Long parentId, DateRange range, Long requestedMemberId) {
-        return withRatio(statMapper.selectSubCategoryStat(UserContext.getFamilyId(), parentId,
-                range.getStart(), range.getEnd(), UserContext.resolveMemberId(requestedMemberId)));
+        Long familyId = UserContext.getFamilyId();
+        Long memberId = UserContext.resolveMemberId(requestedMemberId);
+        List<AmountItem> children = new ArrayList<>(statMapper.selectSubCategoryStat(
+                familyId, parentId, range.getStart(), range.getEnd(), memberId));
+        List<AmountItem> self = statMapper.selectDirectCategoryStat(
+                familyId, parentId, range.getStart(), range.getEnd(), memberId);
+        for (AmountItem item : self) {
+            if (item.getAmount() != null && item.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+                // 不能再拿父分类 ID，否则前端会把「未细分」当成还能继续下钻
+                item.setId(null);
+                children.add(item);
+            }
+        }
+        children.sort((a, b) -> b.getAmount().compareTo(a.getAmount()));
+        return withRatio(children);
     }
 
     /**

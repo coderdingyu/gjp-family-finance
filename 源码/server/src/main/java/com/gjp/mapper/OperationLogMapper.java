@@ -33,8 +33,9 @@ public interface OperationLogMapper {
             + " <if test='module != null and module != \"\"'> AND module = #{module} </if>"
             + " <if test='action != null and action != \"\"'> AND action = #{action} </if>"
             + " <if test='success != null'> AND success = #{success} </if>"
-            + " <if test='keyword != null and keyword != \"\"'> AND (summary LIKE CONCAT('%', #{keyword}, '%') "
-            + "     OR username LIKE CONCAT('%', #{keyword}, '%') OR real_name LIKE CONCAT('%', #{keyword}, '%')) </if>"
+            + " <if test='keyword != null and keyword != \"\"'> AND (summary LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\' "
+            + "     OR username LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\' "
+            + "     OR real_name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\\\') </if>"
             + " <if test='startTime != null'> AND create_time <![CDATA[>=]]> #{startTime} </if>"
             + " <if test='endTime != null'> AND create_time <![CDATA[<=]]> #{endTime} </if>"
             + "</where>";

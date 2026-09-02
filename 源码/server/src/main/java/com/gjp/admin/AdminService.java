@@ -1,6 +1,7 @@
 package com.gjp.admin;
 
 import com.gjp.common.BizException;
+import com.gjp.common.LikeEscape;
 import com.gjp.common.Md5Util;
 import com.gjp.common.Role;
 import com.gjp.common.UserContext;
@@ -101,7 +102,7 @@ public class AdminService {
     /** 全部账号，密码置空后返回 */
     public List<User> users(String keyword, Integer role) {
         UserContext.requireAdmin();
-        List<User> list = userMapper.selectAll(keyword, role);
+        List<User> list = userMapper.selectAll(LikeEscape.of(keyword), role);
         list.forEach(u -> u.setPassword(null));
         return list;
     }
