@@ -13,7 +13,7 @@
         active-text-color="#ffffff"
         router
       >
-        <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债和成员账号 -->
+        <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债 -->
         <template v-if="isFamilyUser">
           <el-menu-item index="/home">
             <el-icon><DataBoard /></el-icon><span>家庭看板</span>
@@ -37,10 +37,7 @@
             <el-icon><House /></el-icon><span>资产负债</span>
           </el-menu-item>
           <el-menu-item index="/member">
-            <el-icon><User /></el-icon><span>成员管理</span>
-          </el-menu-item>
-          <el-menu-item v-if="isOwner" index="/accounts">
-            <el-icon><Key /></el-icon><span>成员账号</span>
+            <el-icon><User /></el-icon><span>成员与账号</span>
           </el-menu-item>
           <el-menu-item index="/category">
             <el-icon><Menu /></el-icon><span>分类管理</span>

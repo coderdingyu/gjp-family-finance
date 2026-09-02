@@ -7,7 +7,7 @@ import { homeOf, verifyCurrentUser } from '../utils/authSession'
  *
  * meta.roles 声明允许访问该页面的角色，路由守卫据此拦截：
  *   · 系统管理员登录后只能进 /admin/*，进不了记账相关页面
- *   · 普通成员进不了资产负债、成员账号、管理员界面
+ *   · 普通成员进不了资产负债、账号管理操作和管理员界面
  * 这只是"不让用户看到无权页面"的体验优化，真正的权限在后端每个接口里。
  */
 const routes = [
@@ -68,13 +68,11 @@ const routes = [
         path: 'member',
         name: 'member',
         component: () => import('../views/member/MemberView.vue'),
-        meta: { title: '成员管理', roles: [ROLE.MEMBER, ROLE.OWNER] }
+        meta: { title: '成员与账号', roles: [ROLE.MEMBER, ROLE.OWNER] }
       },
       {
         path: 'accounts',
-        name: 'accounts',
-        component: () => import('../views/member/AccountsView.vue'),
-        meta: { title: '成员账号', roles: [ROLE.OWNER] }
+        redirect: '/member'
       },
       {
         path: 'category',
