@@ -85,7 +85,8 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="switch">切换账号</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -103,15 +104,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { currentUser as fetchCurrent, logout as doLogout } from '../api/auth'
+import { logout as doLogout } from '../api/auth'
 import QuickAddBall from '../components/QuickAddBall.vue'
-import { clearUser, currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, setUser, ROLE } from '../utils/auth'
+import { clearUser, currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, ROLE } from '../utils/auth'
+import { AUTH_EVENT, publishAuthEvent } from '../utils/authSync'
 
 const route = useRoute()
-const router = useRouter()
 
 const user = currentUser
 const activeMenu = computed(() => route.path)
@@ -122,22 +123,19 @@ const roleTagType = computed(() => {
   return 'info'
 })
 
-onMounted(async () => {
-  // 页面刷新后向后端确认 session 是否还在，避免本地有缓存但服务端已过期
-  try {
-    setUser(await fetchCurrent())
-  } catch (e) {
-    // 401 已由 request 拦截器统一跳转，这里不再重复处理
-  }
-})
-
 async function onCommand(cmd) {
-  if (cmd !== 'logout') return
-  await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
+  if (cmd !== 'logout' && cmd !== 'switch') return
+  const switching = cmd === 'switch'
+  await ElMessageBox.confirm(
+    switching ? '切换账号将退出当前账号并回到登录页，是否继续？' : '确认退出登录？',
+    switching ? '切换账号' : '提示',
+    { type: 'warning' }
+  )
   await doLogout()
   clearUser()
-  ElMessage.success('已退出登录')
-  router.replace('/login')
+  publishAuthEvent(switching ? AUTH_EVENT.SWITCH : AUTH_EVENT.LOGOUT)
+  ElMessage.success(switching ? '已安全退出，请登录新账号' : '已退出登录')
+  window.location.replace(switching ? '/login?switch=1' : '/login')
 }
 </script>
 

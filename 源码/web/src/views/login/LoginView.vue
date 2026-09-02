@@ -57,13 +57,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
 import { login, register } from '../../api/auth'
 import { ROLE, setUser } from '../../utils/auth'
+import { AUTH_EVENT, publishAuthEvent } from '../../utils/authSync'
 
-const router = useRouter()
 const tab = ref('login')
 const loading = ref(false)
 
@@ -91,9 +90,10 @@ const regRules = {
 
 function enter(user) {
   setUser(user)
+  publishAuthEvent(AUTH_EVENT.LOGIN)
   ElMessage.success(`欢迎回来，${user.realName || user.username}`)
-  // 系统管理员不记账，直接进维护界面
-  router.replace(user.role === ROLE.ADMIN ? '/admin' : '/home')
+  // 整页进入新账号首页，确保旧账号的组件状态、请求和轮询全部销毁。
+  window.location.replace(user.role === ROLE.ADMIN ? '/admin' : '/home')
 }
 
 async function onLogin() {

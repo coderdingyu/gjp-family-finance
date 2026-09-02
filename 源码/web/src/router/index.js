@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ROLE } from '../utils/auth'
+import { currentUser, ROLE } from '../utils/auth'
+import { homeOf, verifyCurrentUser } from '../utils/authSession'
 
 /**
  * 路由表。
@@ -103,32 +104,36 @@ const router = createRouter({
   routes
 })
 
-/** 各角色登录后的落地页 */
-function homeOf(role) {
-  return role === ROLE.ADMIN ? '/admin' : '/home'
-}
-
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from) => {
   document.title = to.meta.title ? `${to.meta.title} - 管家婆` : '管家婆'
 
-  // 守卫里直接读 sessionStorage 而不是读 auth.js 的 ref：
-  // 刷新页面时守卫先于组件执行，此刻 ref 也是从 sessionStorage 初始化的，二者等价；
-  // 但直连某个 URL 时读存储更直观，不依赖模块初始化顺序。
-  const stored = JSON.parse(sessionStorage.getItem('gjp_user') || '{}')
-  const logged = !!stored.userId
-  const role = stored.role ?? ROLE.MEMBER
+  // 首次加载、刷新和直接打开新标签页时，都先向服务端确认真实身份。
+  // 网络暂时不可用时保留本地展示缓存；任何后续业务请求仍会由服务端权限兜底。
+  try {
+    const { user, changed } = await verifyCurrentUser({ broadcastExpiry: true })
+    if (changed && user && from.matched.length) {
+      // 已挂载页面发现身份变化时，必须销毁旧账号的组件状态和未完成请求。
+      window.location.replace(homeOf(user.role))
+      return false
+    }
+  } catch (e) {
+    // 非 401（例如服务未启动）由请求层提示，此处不把网络故障误判为退出登录。
+  }
+  const user = currentUser.value
+  const logged = !!user.userId
+  const role = user.role ?? ROLE.MEMBER
 
   if (!to.meta.public && !logged) {
-    return next('/login')
+    return '/login'
   }
   if (to.meta.public && logged) {
-    return next(homeOf(role))
+    return homeOf(role)
   }
   if (to.meta.roles && !to.meta.roles.includes(role)) {
     // 无权访问就送回该角色的首页，而不是停在一个空白页
-    return next(homeOf(role))
+    return homeOf(role)
   }
-  next()
+  return true
 })
 
 export default router
