@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import router from '../router'
+import { clearUser } from './auth'
+import { AUTH_EVENT, publishAuthEvent } from './authSync'
 
 /**
  * axios 统一实例。
@@ -15,6 +16,25 @@ const request = axios.create({
   withCredentials: true
 })
 
+let authRedirecting = false
+
+function unauthorized(message, config = {}) {
+  const error = new Error(message || '未登录或登录已过期')
+  error.authUnauthorized = true
+
+  // /auth/current 的主动校准由调用方决定是否跳转，避免首次打开登录页也提示“已过期”。
+  if (config.skipAuthRedirect) return Promise.reject(error)
+
+  clearUser()
+  if (!authRedirecting) {
+    authRedirecting = true
+    publishAuthEvent(AUTH_EVENT.EXPIRED)
+    ElMessage.warning('登录已过期，请重新登录')
+    window.location.replace('/login')
+  }
+  return Promise.reject(error)
+}
+
 request.interceptors.response.use(
   (response) => {
     const res = response.data
@@ -22,15 +42,15 @@ request.interceptors.response.use(
       return res.data
     }
     if (res.code === 401) {
-      // 登录过期：跳回登录页，不再弹重复的错误提示
-      ElMessage.warning('登录已过期，请重新登录')
-      router.replace('/login')
-      return Promise.reject(new Error(res.msg))
+      return unauthorized(res.msg, response.config)
     }
     ElMessage.error(res.msg || '操作失败')
     return Promise.reject(new Error(res.msg))
   },
   (error) => {
+    if (error.response?.status === 401) {
+      return unauthorized(error.response.data?.msg, error.config)
+    }
     ElMessage.error('网络异常，请确认后端服务已启动（http://localhost:8080）')
     return Promise.reject(error)
   }

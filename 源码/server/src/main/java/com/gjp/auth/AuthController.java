@@ -6,6 +6,7 @@ import com.gjp.common.LoginInterceptor;
 import com.gjp.common.Result;
 import com.gjp.common.UserContext;
 import com.gjp.log.OperationLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,23 +29,35 @@ public class AuthController {
     private OperationLogService logService;
 
     @PostMapping("/register")
-    public Result<UserContext.LoginUser> register(@Valid @RequestBody RegisterDTO dto, HttpSession session) {
+    public Result<UserContext.LoginUser> register(@Valid @RequestBody RegisterDTO dto,
+                                                  HttpServletRequest request) {
         UserContext.LoginUser user = authService.register(dto);
+        HttpSession session = request.getSession();
+        request.changeSessionId();
         session.setAttribute(LoginInterceptor.SESSION_KEY, user);
         return Result.ok(user);
     }
 
     @PostMapping("/login")
-    public Result<UserContext.LoginUser> login(@Valid @RequestBody LoginDTO dto, HttpSession session) {
+    public Result<UserContext.LoginUser> login(@Valid @RequestBody LoginDTO dto,
+                                               HttpServletRequest request) {
+        // 必须先完成账号密码与禁用状态校验，再轮换 Session ID。
+        // 这样登录失败不会破坏当前身份，登录成功也不会沿用可能被固定的旧 ID。
         UserContext.LoginUser user = authService.login(dto);
+        HttpSession session = request.getSession();
+        request.changeSessionId();
         session.setAttribute(LoginInterceptor.SESSION_KEY, user);
         return Result.ok(user);
     }
 
     @PostMapping("/logout")
-    public Result<Void> logout(HttpSession session) {
+    public Result<Void> logout(HttpServletRequest request) {
         // 退出接口没有经过登录拦截器，所以 UserContext 是空的，
         // 操作人信息只能从 session 里取，取完再销毁 session
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return Result.ok();
+        }
         Object attr = session.getAttribute(LoginInterceptor.SESSION_KEY);
         if (attr instanceof UserContext.LoginUser u) {
             logService.recordAuth(OperationLogService.A_LOGOUT, u.getUserId(), u.getUsername(),
