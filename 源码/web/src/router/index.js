@@ -34,6 +34,12 @@ const routes = [
         meta: { title: '收支流水', roles: [ROLE.MEMBER, ROLE.OWNER] }
       },
       {
+        path: 'import',
+        name: 'import',
+        component: () => import('../views/import/ImportView.vue'),
+        meta: { title: '文件导入', roles: [ROLE.MEMBER, ROLE.OWNER] }
+      },
+      {
         path: 'stat',
         name: 'stat',
         component: () => import('../views/stat/StatView.vue'),

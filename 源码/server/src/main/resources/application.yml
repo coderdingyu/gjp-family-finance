@@ -13,6 +13,10 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
     default-property-inclusion: always
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 80MB
 
 mybatis:
   configuration:
@@ -21,6 +25,22 @@ mybatis:
     # 开发期打印 SQL，方便排查统计口径问题；验收演示时可改成 NoLoggingImpl
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   type-aliases-package: com.gjp.entity
+
+gjp:
+  import:
+    upload-dir: ${GJP_IMPORT_DIR:./uploads/import}
+    max-files: 8
+  dify:
+    # 本地 Dify（docker-nginx 映射 80）的 API 前缀。密钥只从环境变量读，不要写进仓库。
+    base-url: ${DIFY_BASE_URL:http://127.0.0.1/v1}
+    api-key: ${DIFY_API_KEY:}
+    # 对应工作室应用「管家婆账单导入」工作流；对话型智能体才用 chat
+    mode: ${DIFY_MODE:workflow}
+    user: ${DIFY_USER:gjp}
+    file-var: bill_file
+    text-var: text_content
+    categories-var: categories
+    timeout-seconds: 180
 
 logging:
   level:

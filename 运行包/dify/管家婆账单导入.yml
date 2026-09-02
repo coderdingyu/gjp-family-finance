@@ -1,0 +1,227 @@
+app:
+  description: 从图片、PDF 或 Excel 表格文本中抽出家庭收支流水 JSON。只解析不写库。
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: 管家婆账单导入
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 8
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1788327747622-source-1788327900675-target
+      source: '1788327747622'
+      sourceHandle: source
+      target: '1788327900675'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1788327900675-source-1788328000001-target
+      source: '1788327900675'
+      sourceHandle: source
+      target: '1788328000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 管家婆导入入口
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - image
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          label: 账单文件
+          max_length: 48
+          required: false
+          type: file
+          variable: bill_file
+        - label: 表格文本
+          max_length: 80000
+          required: false
+          type: paragraph
+          variable: text_content
+        - label: 分类名单
+          max_length: 20000
+          required: false
+          type: paragraph
+          variable: categories
+      height: 189
+      id: '1788327747622'
+      position:
+        x: 80
+        y: 240
+      positionAbsolute:
+        x: 80
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: 抽出流水 JSON
+        model:
+          completion_params:
+            temperature: 0.6
+          mode: chat
+          name: qwen3.8-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: sys
+          role: system
+          text: "你是「管家婆」家庭收支管理系统的账单解析智能体。\n用户会给你一张图片、一份 PDF，或一段从 Excel/CSV 抽出来的表格文本。\n\
+            你的任务是抽出其中的收支流水。文件里可能有几十上百笔，必须尽量逐笔抽取，不要合并、不要只给汇总。\n\n只输出一个 JSON 对象，不要 Markdown，不要解释。格式：\n\
+            {\n  \"relevant\": true,\n  \"reason\": \"\",\n  \"records\": [\n    {\n\
+            \      \"type\": 2,\n      \"amount\": 28.50,\n      \"recordDate\": \"\
+            2026-08-01\",\n      \"categoryName\": \"正餐\",\n      \"merchant\": \"\
+            海底捞\",\n      \"area\": \"\",\n      \"payMethod\": \"微信\",\n      \"\
+            isGift\": 0,\n      \"remark\": \"\"\n    }\n  ]\n}\n\n规则：\n1. type：1=收入，2=支出。看不出时按支出。\n\
+            2. amount 必须是大于 0 的数字。\n3. recordDate 用 YYYY-MM-DD。没有年份时用当年；完全没有日期则跳过该行。\n\
+            4. categoryName 必须从用户提供的分类名单里选一个最接近的末级分类，不要自造分类。\n5. payMethod 只能是：现金\
+            \ / 微信 / 支付宝 / 银行卡 / 其他，不确定就留空。\n6. isGift：礼金、红包、随份子、请客送礼为 1，否则 0。\n7.\
+            \ 如果文件与家庭账单无关（风景照、论文、合同、纯文字小说、空白表等）：\n   返回 {\"relevant\": false, \"reason\"\
+            : \"一句话说明为什么不是账单\", \"records\": []}\n8. 能看懂一部分就抽一部分；完全看不懂按无关文件处理。\n9.\
+            \ 商家、片区、备注、分类名一律用中文原文，禁止翻译成英文。categoryName 必须是分类名单里的中文末级名（例如正餐、咖啡奶茶），不要写\
+            \ Dinner / Coffee。\n"
+        - id: user
+          role: user
+          text: '可选末级分类名单：
+
+            {{#1788327747622.categories#}}
+
+
+            以下是从表格文件抽出的文本（可能为空，此时请识别附件账单）：
+
+            {{#1788327747622.text_content#}}
+
+
+            请识别附件或上述文本中的账单。如果内容与家庭收支无关，按无关文件返回。'
+        selected: true
+        title: 账单解析
+        type: llm
+        vision:
+          configs:
+            detail: high
+            variable_selector:
+            - '1788327747622'
+            - bill_file
+          enabled: true
+      height: 116
+      id: '1788327900675'
+      position:
+        x: 400
+        y: 240
+      positionAbsolute:
+        x: 400
+        y: 240
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 输出 JSON
+        outputs:
+        - value_selector:
+          - '1788327900675'
+          - text
+          variable: result
+        selected: false
+        title: 结束
+        type: end
+      height: 116
+      id: '1788328000001'
+      position:
+        x: 720
+        y: 240
+      positionAbsolute:
+        x: 720
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 6.5
+      y: 41.5
+      zoom: 0.9
+  rag_pipeline_variables: []

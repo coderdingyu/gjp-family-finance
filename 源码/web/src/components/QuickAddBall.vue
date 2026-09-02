@@ -100,7 +100,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addRecord, recordOptions } from '../api/record'
 import { listMember } from '../api/member'
@@ -118,9 +118,10 @@ import { today } from '../utils/format'
  *   · 手动记账表单只留必填项，"保存并继续"支持连续记多笔
  */
 const route = useRoute()
+const router = useRouter()
 
-/** 文件上传入口是否可用。第二批（智能体解析）完成后置为 true */
-const uploadReady = ref(false)
+/** 文件上传入口：跳到「文件导入」页，由智能体排队解析后再确认入库 */
+const uploadReady = ref(true)
 
 // 登录页不显示；系统管理员不记账，也不显示
 const visible = computed(() => isFamilyUser.value && route.path !== '/login')
@@ -260,6 +261,7 @@ function openUpload() {
     return
   }
   expanded.value = false
+  router.push('/import')
 }
 
 function onTypeChange() {

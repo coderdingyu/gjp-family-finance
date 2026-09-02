@@ -21,6 +21,9 @@
           <el-menu-item index="/record">
             <el-icon><Tickets /></el-icon><span>收支流水</span>
           </el-menu-item>
+          <el-menu-item index="/import">
+            <el-icon><Upload /></el-icon><span>文件导入</span>
+          </el-menu-item>
           <el-menu-item index="/stat">
             <el-icon><PieChart /></el-icon><span>统计报表</span>
           </el-menu-item>

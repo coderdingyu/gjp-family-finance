@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Update;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 收支流水数据访问（核心表）。
@@ -100,4 +101,11 @@ public interface RecordMapper {
     @Select("SELECT DISTINCT area FROM t_record WHERE family_id = #{familyId} "
             + "AND area IS NOT NULL AND area <> '' ORDER BY area")
     List<String> selectAreas(@Param("familyId") Long familyId);
+
+    @Select("SELECT DATE_FORMAT(record_date, '%Y-%m-%d') AS recordDate, type, amount, "
+            + "IFNULL(merchant, '') AS merchant, COUNT(*) AS cnt "
+            + "FROM t_record WHERE family_id = #{familyId} AND member_id = #{memberId} "
+            + "GROUP BY record_date, type, amount, IFNULL(merchant, '')")
+    List<Map<String, Object>> countImportFingerprints(@Param("familyId") Long familyId,
+                                                      @Param("memberId") Long memberId);
 }

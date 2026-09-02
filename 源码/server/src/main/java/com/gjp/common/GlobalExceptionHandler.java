@@ -7,6 +7,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -32,6 +34,12 @@ public class GlobalExceptionHandler {
                 ? "参数校验失败"
                 : e.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
         return Result.fail(msg);
+    }
+
+    @ExceptionHandler({MaxUploadSizeExceededException.class, MultipartException.class})
+    public Result<Void> handleUpload(Exception e) {
+        log.warn("上传失败：{}", e.getMessage());
+        return Result.fail("文件太大：单个不超过 12MB，一次不超过 80MB");
     }
 
     /** /api/record/abc 这类路径变量类型对不上，不应落到 500 */

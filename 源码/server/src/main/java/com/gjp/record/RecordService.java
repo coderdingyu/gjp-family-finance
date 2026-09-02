@@ -106,14 +106,28 @@ public class RecordService {
     }
 
     public Record add(Record record) {
+        return add(record, true);
+    }
+
+    /**
+     * 文件导入批量入库：逐条仍走同一套校验，但不每条都写操作日志，
+     * 由导入模块在整批结束后记一条「导入」摘要。
+     */
+    public Record addImported(Record record) {
+        return add(record, false);
+    }
+
+    private Record add(Record record, boolean writeLog) {
         Long familyId = UserContext.getFamilyId();
         validate(record, familyId);
         record.setFamilyId(familyId);
         recordMapper.insert(record);
 
         Record saved = detail(record.getId());
-        logService.record(OperationLogService.M_RECORD, OperationLogService.A_ADD, saved.getId(),
-                summary("新增", saved));
+        if (writeLog) {
+            logService.record(OperationLogService.M_RECORD, OperationLogService.A_ADD, saved.getId(),
+                    summary("新增", saved));
+        }
         return saved;
     }
 

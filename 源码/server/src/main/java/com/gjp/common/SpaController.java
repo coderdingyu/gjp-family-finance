@@ -24,6 +24,7 @@ public class SpaController {
             "/login",
             "/home",
             "/record",
+            "/import",
             "/stat",
             "/analysis",
             "/asset",

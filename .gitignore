@@ -9,3 +9,12 @@
 源码/server/target/
 源码/web/dist/
 源码/web/node_modules/
+
+# 用户上传的账单原件，不要进仓库
+uploads/
+源码/server/uploads/
+
+# Dify / 本机密钥，只提交 env.example
+*.env
+!**/.env.example
+!运行包/dify/env.example
