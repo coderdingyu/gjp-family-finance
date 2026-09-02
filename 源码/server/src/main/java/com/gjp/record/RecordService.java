@@ -70,7 +70,19 @@ public class RecordService {
                 && q.getStartDate().isAfter(q.getEndDate())) {
             throw new BizException("起始日期不能晚于结束日期");
         }
+        if (q.getMinAmount() != null && q.getMaxAmount() != null
+                && q.getMinAmount().compareTo(q.getMaxAmount()) > 0) {
+            throw new BizException("金额下限不能大于上限");
+        }
+        if (q.getKeyword() != null && !q.getKeyword().isBlank()) {
+            q.setKeyword(escapeLike(q.getKeyword().trim()));
+        }
         q.setOffset((q.getPageNum() - 1) * q.getPageSize());
+    }
+
+    /** 把用户输入的 % _ \ 当成字面量，避免 keyword='%' 变成查全部 */
+    private String escapeLike(String keyword) {
+        return keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     public Record detail(Long id) {
@@ -136,6 +148,9 @@ public class RecordService {
             // 例如把"工资收入"选到一笔支出上，这类数据会让统计结果完全失真
             throw new BizException("分类【" + category.getCategoryName() + "】属于"
                     + (category.getType() == 1 ? "收入" : "支出") + "类，与当前流水类型不一致");
+        }
+        if (categoryMapper.countChildren(category.getId()) > 0) {
+            throw new BizException("请选择到二级分类，不要只选一级");
         }
 
         if (record.getAmount() == null) {

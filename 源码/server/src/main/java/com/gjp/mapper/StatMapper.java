@@ -70,13 +70,18 @@ public interface StatMapper {
                                         @Param("startDate") LocalDate startDate,
                                         @Param("endDate") LocalDate endDate);
 
-    /** 按二级分类汇总（钻取用）：给定一级分类，看它下面各二级分类的构成 */
-    @Select("SELECT c.id AS id, c.category_name AS name, "
+    /** 按二级分类汇总（钻取用）。记在一级分类本身上的流水单独列为「未细分」，避免饼图钻取漏账 */
+    @Select("SELECT c.id AS id, "
+            + "       CASE WHEN c.id = #{parentId} THEN CONCAT(c.category_name, '（未细分）') "
+            + "            ELSE c.category_name END AS name, "
             + "       COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count "
             + "FROM t_record r JOIN t_category c ON r.category_id = c.id "
-            + "WHERE r.family_id = #{familyId} AND c.parent_id = #{parentId} "
+            + "WHERE r.family_id = #{familyId} "
+            + "AND (c.parent_id = #{parentId} OR c.id = #{parentId}) "
             + "AND r.record_date BETWEEN #{startDate} AND #{endDate} "
-            + "GROUP BY c.id, c.category_name ORDER BY amount DESC")
+            + "GROUP BY c.id, CASE WHEN c.id = #{parentId} THEN CONCAT(c.category_name, '（未细分）') "
+            + "                   ELSE c.category_name END "
+            + "ORDER BY amount DESC")
     List<AmountItem> selectSubCategoryStat(@Param("familyId") Long familyId, @Param("parentId") Long parentId,
                                            @Param("startDate") LocalDate startDate,
                                            @Param("endDate") LocalDate endDate);
@@ -92,10 +97,13 @@ public interface StatMapper {
                                       @Param("startDate") LocalDate startDate,
                                       @Param("endDate") LocalDate endDate);
 
-    /** 商家消费排行：回答"年度外部餐饮主要在哪些商家消费" */
+    /** 商家消费排行。房租房贷月供不进榜，避免把还款银行当成消费商家 */
     @Select("SELECT r.merchant AS name, COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count "
-            + "FROM t_record r WHERE r.family_id = #{familyId} AND r.type = 2 "
+            + "FROM t_record r "
+            + "JOIN t_category c ON r.category_id = c.id "
+            + "WHERE r.family_id = #{familyId} AND r.type = 2 "
             + "AND r.merchant IS NOT NULL AND r.merchant <> '' "
+            + "AND c.category_name NOT IN ('房租房贷') "
             + "AND r.record_date BETWEEN #{startDate} AND #{endDate} "
             + "GROUP BY r.merchant ORDER BY amount DESC LIMIT #{limit}")
     List<AmountItem> selectMerchantRank(@Param("familyId") Long familyId,

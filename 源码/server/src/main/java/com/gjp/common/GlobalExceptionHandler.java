@@ -6,6 +6,9 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理。保证任何情况下前端拿到的都是标准 Result 结构，不会收到一坨 500 堆栈。
@@ -29,6 +32,20 @@ public class GlobalExceptionHandler {
                 ? "参数校验失败"
                 : e.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
         return Result.fail(msg);
+    }
+
+    /** /api/record/abc 这类路径变量类型对不上，不应落到 500 */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public Result<Void> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log.warn("参数类型不匹配：{}", e.getMessage());
+        return Result.fail("请求参数不正确");
+    }
+
+    /** 已登录后访问不存在的接口（如 /api/auth/me）原先会被收成系统异常 */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public Result<Void> handleNotFound(Exception e) {
+        log.warn("接口不存在：{}", e.getMessage());
+        return Result.fail(404, "接口不存在");
     }
 
     /** 兜底：未预料到的异常，日志打全栈，返回给前端的信息不暴露内部细节 */

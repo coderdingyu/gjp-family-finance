@@ -73,11 +73,9 @@ public class StatService {
 
         List<MonthAmount> full = new ArrayList<>();
         YearMonth cursor = YearMonth.from(range.getStart());
-        YearMonth last = YearMonth.from(range.getEnd());
-        YearMonth thisMonth = YearMonth.now();
-        // 区间末超过当月时截断到当月；但若起始月本身就在未来（用户查了下一年），至少保留一个月避免返回空列表
-        if (last.isAfter(thisMonth) && !cursor.isAfter(thisMonth)) {
-            last = thisMonth;
+        YearMonth last = YearMonth.from(range.effectiveEnd());
+        if (last.isBefore(cursor)) {
+            last = cursor;
         }
         while (!cursor.isAfter(last)) {
             String key = String.format("%04d-%02d", cursor.getYear(), cursor.getMonthValue());
@@ -189,8 +187,24 @@ public class StatService {
         map.put("merchantRank", merchantRank(range, 10));
         map.put("areaStat", areaStat(range));
         map.put("payMethod", payMethodStat(2, range));
-        map.put("budget", budgetStat(YearMonth.from(range.getEnd())));
+        YearMonth budgetYm = budgetMonthOf(range);
+        map.put("budget", budgetStat(budgetYm));
+        map.put("budgetMonth", budgetYm.toString());
         return map;
+    }
+
+    /**
+     * 看板预算始终落在「今天所在月」（若该月落在所选区间内）。
+     * 按年查看时区间末日是 12-31，若跟着区间走会把 12 月空账当成当月预算。
+     */
+    YearMonth budgetMonthOf(DateRange range) {
+        YearMonth now = YearMonth.now();
+        YearMonth start = YearMonth.from(range.getStart());
+        YearMonth end = YearMonth.from(range.effectiveEnd());
+        if (!now.isBefore(start) && !now.isAfter(end)) {
+            return now;
+        }
+        return now.isAfter(end) ? end : start;
     }
 
     /** 统一计算占比，前端直接拿百分数用 */

@@ -38,8 +38,8 @@ public interface RecordMapper {
             + " <if test='q.isGift != null'> AND r.is_gift = #{q.isGift} </if>"
             + " <if test='q.minAmount != null'> AND r.amount <![CDATA[>=]]> #{q.minAmount} </if>"
             + " <if test='q.maxAmount != null'> AND r.amount <![CDATA[<=]]> #{q.maxAmount} </if>"
-            + " <if test='q.keyword != null and q.keyword != \"\"'> AND (r.merchant LIKE CONCAT('%', #{q.keyword}, '%') "
-            + "     OR r.remark LIKE CONCAT('%', #{q.keyword}, '%')) </if>"
+            + " <if test='q.keyword != null and q.keyword != \"\"'> AND (r.merchant LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\' "
+            + "     OR r.remark LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\') </if>"
             + " </where> ";
 
     @Select("<script>"

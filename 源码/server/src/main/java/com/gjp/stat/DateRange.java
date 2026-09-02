@@ -50,9 +50,31 @@ public class DateRange {
         return end;
     }
 
-    /** 区间跨越的月份数，用于算月均，至少为 1，避免除零 */
+    /**
+     * 统计用的有效结束日：区间末若还在未来，截到今天。
+     * 按年查看当年时区间末是 12-31，不截断会把未发生的月份算进月均、预算和分析。
+     * 起始日本身就在未来（查了下一年）时保持原值，避免把区间收成空。
+     */
+    public LocalDate effectiveEnd() {
+        LocalDate today = LocalDate.now();
+        if (end.isAfter(today) && !start.isAfter(today)) {
+            return today;
+        }
+        return end;
+    }
+
+    /** 尚未过完的当前月：环比、异常月均值不应把它当成完整月 */
+    public static boolean isIncompleteMonth(YearMonth ym) {
+        YearMonth now = YearMonth.now();
+        return ym.equals(now) && LocalDate.now().isBefore(now.atEndOfMonth());
+    }
+
+    /** 区间跨越的月份数（未来空月不计入），用于算月均，至少为 1，避免除零 */
     public int monthCount() {
-        int months = (end.getYear() - start.getYear()) * 12 + (end.getMonthValue() - start.getMonthValue()) + 1;
+        YearMonth startYm = YearMonth.from(start);
+        YearMonth endYm = YearMonth.from(effectiveEnd());
+        int months = (endYm.getYear() - startYm.getYear()) * 12
+                + (endYm.getMonthValue() - startYm.getMonthValue()) + 1;
         return Math.max(months, 1);
     }
 

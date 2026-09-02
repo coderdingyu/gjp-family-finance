@@ -71,6 +71,30 @@
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :md="6" :sm="12">
+            <el-form-item label="金额≥">
+              <el-input-number
+                v-model="query.minAmount"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                placeholder="不限"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :md="6" :sm="12">
+            <el-form-item label="金额≤">
+              <el-input-number
+                v-model="query.maxAmount"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                placeholder="不限"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
         <div class="btns">
           <el-button type="primary" plain :icon="Search" @click="search">查询</el-button>
@@ -187,8 +211,8 @@
           <el-cascader
             v-model="form.categoryPath"
             :options="formCategoryOptions"
-            :props="{ checkStrictly: true, value: 'id', label: 'categoryName', children: 'children' }"
-            placeholder="请选择分类，可只选一级"
+            :props="{ checkStrictly: false, value: 'id', label: 'categoryName', children: 'children' }"
+            placeholder="请选择到二级分类"
             style="width: 100%"
           />
         </el-form-item>
@@ -298,6 +322,8 @@ function emptyQuery() {
     payMethod: null,
     area: null,
     isGift: null,
+    minAmount: null,
+    maxAmount: null,
     pageNum: 1,
     pageSize: 10
   }

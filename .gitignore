@@ -4,3 +4,8 @@
 # GitHub 单文件上限 100MB，JDK 压缩包约 172MB，无法入库。
 # 克隆后运行 环境/安装环境.sh 会自动下载对应平台的 JDK。
 环境/jdk-*.tar.gz
+
+# 构建产物：交付用 jar 只放在 运行包/
+源码/server/target/
+源码/web/dist/
+源码/web/node_modules/

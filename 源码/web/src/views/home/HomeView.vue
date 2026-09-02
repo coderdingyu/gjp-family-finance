@@ -105,7 +105,7 @@
       </el-col>
       <el-col :md="8">
         <div class="page-card budget-card">
-          <h3 class="card-title">成员预算执行（当月）</h3>
+          <h3 class="card-title">成员预算执行（{{ data.budgetMonth || '当月' }}）</h3>
           <div v-if="!data.budget?.length" class="text-light">暂无成员数据</div>
           <div v-for="b in data.budget" :key="b.memberId" class="budget-row">
             <div class="budget-head">

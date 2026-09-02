@@ -122,10 +122,15 @@ public class AssetService {
         return Math.max(total - paid, 0);
     }
 
-    /** 剩余本金按"剩余期数 × 月供"估算，等额本息的利息部分不单独拆分，够家庭记账使用 */
+    /**
+     * 剩余本金按"剩余期数 × 月供"估算，等额本息的利息不单独拆分。
+     * 必须封顶为贷款总额，否则房贷这类"总还款额 > 本金"的记录会算出剩余本金倒挂，净资产被算少。
+     */
     private BigDecimal remainAmount(Loan loan) {
-        return loan.getMonthlyPayment().multiply(BigDecimal.valueOf(remainMonths(loan)))
+        BigDecimal naive = loan.getMonthlyPayment().multiply(BigDecimal.valueOf(remainMonths(loan)))
                 .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = loan.getTotalAmount() == null ? BigDecimal.ZERO : loan.getTotalAmount();
+        return naive.min(total).max(BigDecimal.ZERO);
     }
 
     public Loan addLoan(Loan loan) {
@@ -176,6 +181,9 @@ public class AssetService {
         }
         if (loan.getPaidMonths() > loan.getTotalMonths()) {
             throw new BizException("已还期数不能超过总期数");
+        }
+        if (loan.getStartDate() != null && loan.getStartDate().isAfter(LocalDate.now())) {
+            throw new BizException("起始还款日不能晚于今天");
         }
     }
 

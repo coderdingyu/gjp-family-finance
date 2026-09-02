@@ -15,6 +15,7 @@ import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -100,12 +101,7 @@ public class AnalysisService {
      * 并根据该分类在其他月份是否也高频出现，判断这笔支出是偶发还是会持续。
      */
     private void analyzeAbnormalMonth(List<AnalysisItem> items, List<MonthAmount> trend, DateRange range) {
-        List<MonthAmount> withData = new ArrayList<>();
-        for (MonthAmount m : trend) {
-            if (m.getExpense().compareTo(BigDecimal.ZERO) > 0) {
-                withData.add(m);
-            }
-        }
+        List<MonthAmount> withData = completeMonthsWithExpense(trend);
         if (withData.size() < 2) {
             return;
         }
@@ -137,7 +133,7 @@ public class AnalysisService {
                 UserContext.getFamilyId(), DateRange.ofMonth(peakMonth).getStart(),
                 DateRange.ofMonth(peakMonth).getEnd()));
         Map<String, BigDecimal> allByCat = toMap(statMapper.selectExpenseByCategory(
-                UserContext.getFamilyId(), range.getStart(), range.getEnd()));
+                UserContext.getFamilyId(), range.getStart(), range.effectiveEnd()));
 
         String topCat = null;
         BigDecimal topGap = BigDecimal.ZERO;
@@ -185,15 +181,11 @@ public class AnalysisService {
     }
 
     /**
-     * A2 环比分析。取区间内最后两个有数据的月份做对比，回答"最近是不是花多了"。
+     * A2 环比分析。取区间内最后两个【完整】有数据月份做对比，未过完的当月不参与，
+     * 避免 9 月几笔测试账对比 8 月整月被写成「环比暴跌」。
      */
     private void analyzeMonthOnMonth(List<AnalysisItem> items, List<MonthAmount> trend) {
-        List<MonthAmount> withData = new ArrayList<>();
-        for (MonthAmount m : trend) {
-            if (m.getExpense().compareTo(BigDecimal.ZERO) > 0) {
-                withData.add(m);
-            }
-        }
+        List<MonthAmount> withData = completeMonthsWithExpense(trend);
         if (withData.size() < 2) {
             return;
         }
@@ -243,24 +235,62 @@ public class AnalysisService {
         }
     }
 
-    /** A4 成员预算执行，逐个成员判断是否超支。 */
+    /**
+     * A4 成员预算执行。按年/自定义区间时扫描区间内每一个月（截到今天），
+     * 避免只看区间末日（12 月）而漏掉 5 月已经发生的超支。
+     */
     private void analyzeBudget(List<AnalysisItem> items, DateRange range) {
-        YearMonth target = YearMonth.from(range.getEnd());
-        for (BudgetVO b : statService.budgetStat(target)) {
-            if ("已超支".equals(b.getStatus())) {
-                items.add(new AnalysisItem("A4", "danger",
-                        b.getMemberName() + " 在 " + target + " 已超出月度预算",
-                        "预算 " + b.getBudget() + " 元，实际支出 " + b.getExpense() + " 元，使用率 "
-                                + b.getUsedRate() + "%，超出 " + b.getExpense().subtract(b.getBudget()) + " 元。",
-                        "建议与该成员核对超支明细；若预算本身设置偏低，可在【成员管理】中调整月度预算。"));
-            } else if ("接近上限".equals(b.getStatus())) {
-                items.add(new AnalysisItem("A4", "warning",
-                        b.getMemberName() + " 在 " + target + " 的预算即将用完",
-                        "预算 " + b.getBudget() + " 元，实际支出 " + b.getExpense() + " 元，使用率 "
-                                + b.getUsedRate() + "%。",
-                        "本月剩余额度不多，建议暂缓非必要消费。"));
+        YearMonth cursor = YearMonth.from(range.getStart());
+        YearMonth last = YearMonth.from(range.effectiveEnd());
+        Map<String, List<String>> over = new LinkedHashMap<>();
+        Map<String, List<String>> near = new LinkedHashMap<>();
+
+        for (YearMonth ym = cursor; !ym.isAfter(last); ym = ym.plusMonths(1)) {
+            boolean skipNear = DateRange.isIncompleteMonth(ym);
+            for (BudgetVO b : statService.budgetStat(ym)) {
+                if ("未设预算".equals(b.getStatus())) {
+                    continue;
+                }
+                String line = ym + " 预算 " + b.getBudget() + " 元，实际支出 " + b.getExpense()
+                        + " 元，使用率 " + b.getUsedRate() + "%";
+                if ("已超支".equals(b.getStatus())) {
+                    over.computeIfAbsent(b.getMemberName(), k -> new ArrayList<>()).add(line);
+                } else if ("接近上限".equals(b.getStatus()) && !skipNear) {
+                    near.computeIfAbsent(b.getMemberName(), k -> new ArrayList<>()).add(line);
+                }
             }
         }
+
+        for (Map.Entry<String, List<String>> e : over.entrySet()) {
+            near.remove(e.getKey());
+            List<String> lines = e.getValue();
+            items.add(new AnalysisItem("A4", "danger",
+                    e.getKey() + " 在所选区间有 " + lines.size() + " 个月超出月度预算",
+                    String.join("；", lines) + "。",
+                    "建议与该成员核对超支明细；若预算本身设置偏低，可在【成员管理】中调整月度预算。"));
+        }
+        for (Map.Entry<String, List<String>> e : near.entrySet()) {
+            List<String> lines = e.getValue();
+            items.add(new AnalysisItem("A4", "warning",
+                    e.getKey() + " 在所选区间有 " + lines.size() + " 个月预算接近上限",
+                    String.join("；", lines) + "。",
+                    "剩余额度不多，建议暂缓非必要消费。"));
+        }
+    }
+
+    /** 有支出且已过完的月份；未结束的当月不进入异常月 / 环比样本 */
+    private List<MonthAmount> completeMonthsWithExpense(List<MonthAmount> trend) {
+        List<MonthAmount> withData = new ArrayList<>();
+        for (MonthAmount m : trend) {
+            YearMonth ym = YearMonth.parse(m.getYm());
+            if (DateRange.isIncompleteMonth(ym)) {
+                continue;
+            }
+            if (m.getExpense().compareTo(BigDecimal.ZERO) > 0) {
+                withData.add(m);
+            }
+        }
+        return withData;
     }
 
     /** A5 支出结构集中度：占比最高的一级分类。 */
