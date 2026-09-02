@@ -34,7 +34,7 @@
           />
         </el-form-item>
         <el-form-item label="关键字">
-          <el-input v-model="query.keyword" placeholder="摘要 / 账号 / 姓名" clearable
+          <el-input v-model="query.keyword" :placeholder="isAdmin ? '关键字' : '摘要 / 账号 / 姓名'" clearable
                     style="width: 180px" @keyup.enter="search" />
         </el-form-item>
         <el-form-item>
@@ -61,21 +61,27 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column v-if="isAdmin" label="家庭" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.familyId === 0">系统</span>
+            <span v-else>{{ row.familyId }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="模块" width="76" align="center">
           <template #default="{ row }">
             <el-tag size="small" effect="plain">{{ row.module }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="action" label="动作" width="86" align="center" />
-        <el-table-column label="操作人" width="130">
+        <el-table-column v-if="!isAdmin" label="操作人" width="130">
           <template #default="{ row }">
             {{ row.realName || '—' }}
             <span class="text-light">{{ row.username ? '(' + row.username + ')' : '' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="操作摘要" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="ip" label="来源IP" width="120" />
-        <el-table-column label="失败原因" min-width="140" show-overflow-tooltip>
+        <el-table-column v-if="!isAdmin" prop="summary" label="操作摘要" min-width="300" show-overflow-tooltip />
+        <el-table-column v-if="!isAdmin" prop="ip" label="来源IP" width="120" />
+        <el-table-column v-if="!isAdmin" label="失败原因" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.errorMsg" class="amount-expense">{{ row.errorMsg }}</span>
             <span v-else class="text-light">—</span>

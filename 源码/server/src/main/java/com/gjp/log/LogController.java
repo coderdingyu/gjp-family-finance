@@ -2,7 +2,6 @@ package com.gjp.log;
 
 import com.gjp.common.PageResult;
 import com.gjp.common.Result;
-import com.gjp.entity.OperationLog;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +23,7 @@ public class LogController {
     private OperationLogService logService;
 
     @PostMapping("/page")
-    public Result<PageResult<OperationLog>> page(@RequestBody LogQuery query) {
+    public Result<PageResult<?>> page(@RequestBody LogQuery query) {
         return Result.ok(logService.page(query));
     }
 
