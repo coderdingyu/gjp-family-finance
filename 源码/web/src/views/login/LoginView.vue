@@ -7,6 +7,7 @@
         <li>收支流水多维度录入，商家、片区、人情往来一次记全</li>
         <li>月度年度统计报表，分类占比与收支趋势一目了然</li>
         <li>智能分析给出结论：哪个月超支、超在哪、是偶发还是会持续</li>
+        <li>三级分类、账单查重、操作日志，权限按户主与成员分级</li>
       </ul>
     </div>
 
@@ -60,6 +61,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
 import { login, register } from '../../api/auth'
+import { ROLE, setUser } from '../../utils/auth'
 
 const router = useRouter()
 const tab = ref('login')
@@ -88,9 +90,10 @@ const regRules = {
 }
 
 function enter(user) {
-  sessionStorage.setItem('gjp_user', JSON.stringify(user))
+  setUser(user)
   ElMessage.success(`欢迎回来，${user.realName || user.username}`)
-  router.replace('/home')
+  // 系统管理员不记账，直接进维护界面
+  router.replace(user.role === ROLE.ADMIN ? '/admin' : '/home')
 }
 
 async function onLogin() {

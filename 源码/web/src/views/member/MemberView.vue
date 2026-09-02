@@ -5,8 +5,9 @@
       <div class="bar">
         <span class="text-light">
           成员是收支数据的归属单位。设置月度预算后，看板与智能分析会自动做超支预警。
+          <template v-if="!isOwner">当前为只读，成员由户主统一维护。</template>
         </span>
-        <el-button type="primary" :icon="Plus" @click="openAdd">新增成员</el-button>
+        <el-button v-if="isOwner" type="primary" :icon="Plus" @click="openAdd">新增成员</el-button>
       </div>
 
       <el-table :data="list" v-loading="loading" border stripe size="small">
@@ -26,8 +27,11 @@
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="130" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+            <template v-if="isOwner">
+              <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+            </template>
+            <span v-else class="text-light">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -69,6 +73,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { addMember, deleteMember, listMember, updateMember } from '../../api/member'
 import { money } from '../../utils/format'
+import { isOwner } from '../../utils/auth'
 
 const relations = ['本人', '配偶', '子女', '父母', '其他']
 const loading = ref(false)

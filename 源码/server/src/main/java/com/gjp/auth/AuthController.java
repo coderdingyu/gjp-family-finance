@@ -5,6 +5,7 @@ import com.gjp.auth.dto.RegisterDTO;
 import com.gjp.common.LoginInterceptor;
 import com.gjp.common.Result;
 import com.gjp.common.UserContext;
+import com.gjp.log.OperationLogService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,8 @@ public class AuthController {
 
     @Autowired
     private AuthService authService;
+    @Autowired
+    private OperationLogService logService;
 
     @PostMapping("/register")
     public Result<UserContext.LoginUser> register(@Valid @RequestBody RegisterDTO dto, HttpSession session) {
@@ -40,6 +43,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     public Result<Void> logout(HttpSession session) {
+        // 退出接口没有经过登录拦截器，所以 UserContext 是空的，
+        // 操作人信息只能从 session 里取，取完再销毁 session
+        Object attr = session.getAttribute(LoginInterceptor.SESSION_KEY);
+        if (attr instanceof UserContext.LoginUser u) {
+            logService.recordAuth(OperationLogService.A_LOGOUT, u.getUserId(), u.getUsername(),
+                    u.getRealName(), u.getFamilyId(), "账号 " + u.getUsername() + " 退出登录", true, null);
+        }
         session.invalidate();
         return Result.ok();
     }

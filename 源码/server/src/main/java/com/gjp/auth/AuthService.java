@@ -2,14 +2,15 @@ package com.gjp.auth;
 
 import com.gjp.auth.dto.LoginDTO;
 import com.gjp.auth.dto.RegisterDTO;
+import com.gjp.category.CategoryService;
 import com.gjp.common.BizException;
 import com.gjp.common.Md5Util;
+import com.gjp.common.Role;
 import com.gjp.common.UserContext;
-import com.gjp.entity.Category;
 import com.gjp.entity.Family;
 import com.gjp.entity.Member;
 import com.gjp.entity.User;
-import com.gjp.mapper.CategoryMapper;
+import com.gjp.log.OperationLogService;
 import com.gjp.mapper.FamilyMapper;
 import com.gjp.mapper.MemberMapper;
 import com.gjp.mapper.UserMapper;
@@ -21,28 +22,12 @@ import java.math.BigDecimal;
 
 /**
  * 登录注册业务。
+ *
+ * 注册即"开一个新家庭"，注册人自动成为**户主**（能看全家数据）。
+ * 家庭里其他成员的账号由户主在成员管理里另外开，默认是普通成员（只能看自己）。
  */
 @Service
 public class AuthService {
-
-    /** 注册时为新家庭初始化的预置分类：{一级分类, 二级分类...}，第一行是收入，其余是支出 */
-    private static final String[][] DEFAULT_INCOME = {
-            {"工资收入", "基本工资", "奖金", "加班费"},
-            {"投资收益", "利息", "股票基金", "房租收入"},
-            {"其他收入", "红包礼金", "报销", "兼职"}
-    };
-
-    private static final String[][] DEFAULT_EXPENSE = {
-            {"餐饮支出", "家庭买菜", "外出就餐", "外卖", "饮品零食"},
-            {"购物支出", "服饰鞋帽", "日用品", "数码家电", "美妆护理"},
-            {"居住支出", "房租房贷", "水电燃气", "物业费", "维修装修"},
-            {"交通支出", "公共交通", "打车", "加油", "停车过路费"},
-            {"教育支出", "学费", "书籍资料", "培训班"},
-            {"医疗健康", "门诊药品", "住院", "体检保险"},
-            {"文化娱乐", "旅游度假", "健身运动", "影音娱乐"},
-            {"人情往来", "礼金红包", "送礼", "请客吃饭"},
-            {"其他支出", "手续费", "捐赠", "杂项"}
-    };
 
     @Autowired
     private UserMapper userMapper;
@@ -51,7 +36,9 @@ public class AuthService {
     @Autowired
     private MemberMapper memberMapper;
     @Autowired
-    private CategoryMapper categoryMapper;
+    private CategoryService categoryService;
+    @Autowired
+    private OperationLogService logService;
 
     /**
      * 注册。整个过程放在一个事务里：家庭、账号、默认成员、预置分类要么全部成功，
@@ -67,13 +54,6 @@ public class AuthService {
         family.setFamilyName(dto.getFamilyName());
         familyMapper.insert(family);
 
-        User user = new User();
-        user.setUsername(dto.getUsername());
-        user.setPassword(Md5Util.md5(dto.getPassword()));
-        user.setRealName(dto.getRealName());
-        user.setFamilyId(family.getId());
-        userMapper.insert(user);
-
         // 注册人自动成为家庭的第一个成员，否则记账时无成员可选
         Member self = new Member();
         self.setFamilyId(family.getId());
@@ -82,42 +62,23 @@ public class AuthService {
         self.setMonthlyBudget(BigDecimal.ZERO);
         memberMapper.insert(self);
 
-        initDefaultCategories(family.getId());
+        User user = new User();
+        user.setUsername(dto.getUsername());
+        user.setPassword(Md5Util.md5(dto.getPassword()));
+        user.setRealName(dto.getRealName());
+        user.setFamilyId(family.getId());
+        user.setMemberId(self.getId());
+        user.setRole(Role.OWNER);
+        user.setStatus(1);
+        userMapper.insert(user);
 
-        return new UserContext.LoginUser(user.getId(), user.getUsername(), user.getRealName(),
-                family.getId(), family.getFamilyName());
-    }
+        categoryService.initDefaultCategories(family.getId());
 
-    /** 为新家庭写入两级预置分类，is_default = 1 表示不允许删除 */
-    private void initDefaultCategories(Long familyId) {
-        insertCategoryGroup(familyId, 1, DEFAULT_INCOME);
-        insertCategoryGroup(familyId, 2, DEFAULT_EXPENSE);
-    }
-
-    private void insertCategoryGroup(Long familyId, int type, String[][] groups) {
-        int sort = 0;
-        for (String[] group : groups) {
-            Category parent = new Category();
-            parent.setFamilyId(familyId);
-            parent.setParentId(0L);
-            parent.setCategoryName(group[0]);
-            parent.setType(type);
-            parent.setIsDefault(1);
-            parent.setSortNo(sort++);
-            categoryMapper.insert(parent);
-
-            int subSort = 0;
-            for (int i = 1; i < group.length; i++) {
-                Category child = new Category();
-                child.setFamilyId(familyId);
-                child.setParentId(parent.getId());
-                child.setCategoryName(group[i]);
-                child.setType(type);
-                child.setIsDefault(1);
-                child.setSortNo(subSort++);
-                categoryMapper.insert(child);
-            }
-        }
+        UserContext.LoginUser login = toLoginUser(user, family.getFamilyName(), self.getMemberName());
+        logService.recordAuth(OperationLogService.A_LOGIN, user.getId(), user.getUsername(),
+                user.getRealName(), family.getId(),
+                "注册新家庭【" + family.getFamilyName() + "】并登录", true, null);
+        return login;
     }
 
     /** 登录校验，成功返回登录态对象由 Controller 放进 session */
@@ -125,10 +86,45 @@ public class AuthService {
         User user = userMapper.selectByUsername(dto.getUsername());
         if (user == null || !user.getPassword().equals(Md5Util.md5(dto.getPassword()))) {
             // 账号不存在与密码错误提示合并，避免被用来枚举已注册账号
+            logService.recordAuth(OperationLogService.A_LOGIN, user == null ? null : user.getId(),
+                    dto.getUsername(), user == null ? null : user.getRealName(),
+                    user == null ? 0L : user.getFamilyId(),
+                    "登录失败：" + dto.getUsername(), false, "账号或密码错误");
             throw new BizException("账号或密码错误");
         }
-        Family family = familyMapper.selectById(user.getFamilyId());
-        return new UserContext.LoginUser(user.getId(), user.getUsername(), user.getRealName(),
-                user.getFamilyId(), family == null ? "" : family.getFamilyName());
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            logService.recordAuth(OperationLogService.A_LOGIN, user.getId(), user.getUsername(),
+                    user.getRealName(), user.getFamilyId(),
+                    "登录失败：账号已被禁用", false, "账号已被禁用");
+            throw new BizException("该账号已被禁用，请联系管理员");
+        }
+
+        String familyName = "";
+        String memberName = null;
+        if (user.getRole() != null && user.getRole() == Role.ADMIN) {
+            familyName = "系统管理";
+        } else {
+            Family family = familyMapper.selectById(user.getFamilyId());
+            familyName = family == null ? "" : family.getFamilyName();
+            if (user.getMemberId() != null) {
+                Member m = memberMapper.selectById(user.getMemberId(), user.getFamilyId());
+                memberName = m == null ? null : m.getMemberName();
+            }
+        }
+
+        userMapper.touchLastLogin(user.getId());
+        logService.recordAuth(OperationLogService.A_LOGIN, user.getId(), user.getUsername(),
+                user.getRealName(), user.getFamilyId(),
+                Role.name(user.getRole()) + "【" + user.getUsername() + "】登录成功", true, null);
+        return toLoginUser(user, familyName, memberName);
+    }
+
+    private UserContext.LoginUser toLoginUser(User user, String familyName, String memberName) {
+        UserContext.LoginUser login = new UserContext.LoginUser(
+                user.getId(), user.getUsername(), user.getRealName(), user.getFamilyId(), familyName);
+        login.setMemberId(user.getMemberId());
+        login.setMemberName(memberName);
+        login.setRole(user.getRole() == null ? Role.MEMBER : user.getRole());
+        return login;
     }
 }

@@ -9,11 +9,16 @@
             <el-radio-button :value="1">收入分类</el-radio-button>
           </el-radio-group>
           <span class="text-light" style="margin-left: 12px">
-            分类固定两级；带"预置"标记的是系统初始化分类，可改名不可删除
+            分类最多三级（如 文化娱乐 / 影音娱乐 / 游戏充值）；带"预置"标记的是系统初始化分类，可改名不可删除
           </span>
         </div>
         <div>
-          <el-button type="primary" :icon="Plus" @click="openAdd(null)">新增一级分类</el-button>
+          <el-button v-if="isOwner" type="primary" :icon="Plus" @click="openAdd(null)">
+            新增一级分类
+          </el-button>
+          <el-tag v-else type="info" size="small" effect="plain">
+            分类由户主统一维护，当前为只读
+          </el-tag>
         </div>
       </div>
 
@@ -29,8 +34,8 @@
         <el-table-column prop="categoryName" label="分类名称" min-width="220" />
         <el-table-column label="层级" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.parentId === 0 ? 'primary' : 'info'" size="small" effect="plain">
-              {{ row.parentId === 0 ? '一级' : '二级' }}
+            <el-tag :type="levelTag(row.level)" size="small" effect="plain">
+              {{ ['一级', '二级', '三级'][(row.level || 1) - 1] }}
             </el-tag>
           </template>
         </el-table-column>
@@ -43,19 +48,19 @@
         <el-table-column prop="sortNo" label="排序号" width="80" align="center" />
         <el-table-column label="操作" width="230" align="center">
           <template #default="{ row }">
-            <el-button v-if="row.parentId === 0" link type="success" size="small" @click="openAdd(row)">
-              添加子分类
-            </el-button>
-            <el-button link type="primary" size="small" @click="openEdit(row)">改名</el-button>
-            <el-button
-              link
-              type="danger"
-              size="small"
-              :disabled="row.isDefault === 1"
-              @click="onDelete(row)"
-            >
-              删除
-            </el-button>
+            <template v-if="isOwner">
+              <!-- 三级已是最深层级，不再提供"添加子分类" -->
+              <el-button v-if="(row.level || 1) < 3" link type="success" size="small"
+                         @click="openAdd(row)">
+                添加子分类
+              </el-button>
+              <el-button link type="primary" size="small" @click="openEdit(row)">改名</el-button>
+              <el-button link type="danger" size="small" :disabled="row.isDefault === 1"
+                         @click="onDelete(row)">
+                删除
+              </el-button>
+            </template>
+            <span v-else class="text-light">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -87,6 +92,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { addCategory, deleteCategory, treeCategory, updateCategory } from '../../api/category'
+import { isOwner } from '../../utils/auth'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -104,11 +110,16 @@ const rules = {
 
 const dialogTitle = computed(() => {
   if (editing.value) return '修改分类名称'
-  return form.value.parentId ? '新增子分类' : '新增一级分类'
+  if (!form.value.parentId) return '新增一级分类'
+  return `新增${['', '', '二级', '三级'][form.value.parentLevel + 1] || ''}分类`
 })
 
 function emptyForm() {
-  return { id: null, categoryName: '', parentId: 0, parentName: '', sortNo: 99, type: 2 }
+  return { id: null, categoryName: '', parentId: 0, parentName: '', parentLevel: 0, sortNo: 99, type: 2 }
+}
+
+function levelTag(level) {
+  return level === 1 ? 'primary' : level === 2 ? 'warning' : 'info'
 }
 
 onMounted(load)
@@ -129,6 +140,7 @@ function openAdd(parent) {
   if (parent) {
     form.value.parentId = parent.id
     form.value.parentName = parent.categoryName
+    form.value.parentLevel = parent.level || 1
   }
   dialog.value = true
 }

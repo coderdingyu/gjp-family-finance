@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,6 +50,12 @@ public class RecordController {
     public Result<Void> delete(@PathVariable Long id) {
         recordService.delete(id);
         return Result.ok();
+    }
+
+    /** 批量删除，查重页勾选多条后一次删掉；返回实际删除条数 */
+    @DeleteMapping("/batch")
+    public Result<Integer> deleteBatch(@RequestBody List<Long> ids) {
+        return Result.ok(recordService.deleteBatch(ids));
     }
 
     /** 录入页需要的候选项：历史商家、历史片区、支付方式 */

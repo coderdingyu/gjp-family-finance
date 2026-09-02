@@ -15,4 +15,10 @@ mysql -u root < 运行包/data.sql
 java -jar 运行包/gjp-server-1.0.0.jar
 ```
 
-浏览器打开 http://localhost:8080 ，使用 `zhangwei` / `123456` 登录。
+浏览器打开 http://localhost:8080 。密码统一 `123456`：
+
+| 账号 | 角色 | 说明 |
+| ---- | ---- | ---- |
+| `zhangwei` | 户主 | 看全家、可管理成员/分类/资产 |
+| `lijuan` | 普通成员 | 只能看自己的账单 |
+| `admin` | 系统管理员 | 网站维护与跨家庭日志，看不到账单金额 |

@@ -54,8 +54,14 @@ public class Record {
     /** 分类名称，联表查询用，非数据库字段 */
     private String categoryName;
 
-    /** 一级分类名称，联表查询用，非数据库字段 */
+    /** 直接父分类名称，联表查询用，非数据库字段 */
     private String parentCategoryName;
+
+    /** 所属一级分类名称，联表查询用，非数据库字段 */
+    private String rootCategoryName;
+
+    /** 分类层级 1/2/3，前端据此拼分类路径，非数据库字段 */
+    private Integer categoryLevel;
 
     public Long getId() {
         return id;
@@ -183,6 +189,22 @@ public class Record {
 
     public void setParentCategoryName(String parentCategoryName) {
         this.parentCategoryName = parentCategoryName;
+    }
+
+    public String getRootCategoryName() {
+        return rootCategoryName;
+    }
+
+    public void setRootCategoryName(String rootCategoryName) {
+        this.rootCategoryName = rootCategoryName;
+    }
+
+    public Integer getCategoryLevel() {
+        return categoryLevel;
+    }
+
+    public void setCategoryLevel(Integer categoryLevel) {
+        this.categoryLevel = categoryLevel;
     }
 
 }

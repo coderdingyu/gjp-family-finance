@@ -13,26 +13,42 @@
         active-text-color="#ffffff"
         router
       >
-        <el-menu-item index="/home">
-          <el-icon><DataBoard /></el-icon><span>家庭看板</span>
+        <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债和成员账号 -->
+        <template v-if="isFamilyUser">
+          <el-menu-item index="/home">
+            <el-icon><DataBoard /></el-icon><span>家庭看板</span>
+          </el-menu-item>
+          <el-menu-item index="/record">
+            <el-icon><Tickets /></el-icon><span>收支流水</span>
+          </el-menu-item>
+          <el-menu-item index="/stat">
+            <el-icon><PieChart /></el-icon><span>统计报表</span>
+          </el-menu-item>
+          <el-menu-item index="/analysis">
+            <el-icon><MagicStick /></el-icon><span>智能分析</span>
+          </el-menu-item>
+          <el-menu-item index="/dedup">
+            <el-icon><CopyDocument /></el-icon><span>账单查重</span>
+          </el-menu-item>
+          <el-menu-item v-if="isOwner" index="/asset">
+            <el-icon><House /></el-icon><span>资产负债</span>
+          </el-menu-item>
+          <el-menu-item index="/member">
+            <el-icon><User /></el-icon><span>成员管理</span>
+          </el-menu-item>
+          <el-menu-item v-if="isOwner" index="/accounts">
+            <el-icon><Key /></el-icon><span>成员账号</span>
+          </el-menu-item>
+          <el-menu-item index="/category">
+            <el-icon><Menu /></el-icon><span>分类管理</span>
+          </el-menu-item>
+        </template>
+
+        <el-menu-item v-if="isAdmin" index="/admin">
+          <el-icon><Monitor /></el-icon><span>系统维护</span>
         </el-menu-item>
-        <el-menu-item index="/record">
-          <el-icon><Tickets /></el-icon><span>收支流水</span>
-        </el-menu-item>
-        <el-menu-item index="/stat">
-          <el-icon><PieChart /></el-icon><span>统计报表</span>
-        </el-menu-item>
-        <el-menu-item index="/analysis">
-          <el-icon><MagicStick /></el-icon><span>智能分析</span>
-        </el-menu-item>
-        <el-menu-item index="/asset">
-          <el-icon><House /></el-icon><span>资产负债</span>
-        </el-menu-item>
-        <el-menu-item index="/member">
-          <el-icon><User /></el-icon><span>成员管理</span>
-        </el-menu-item>
-        <el-menu-item index="/category">
-          <el-icon><Menu /></el-icon><span>分类管理</span>
+        <el-menu-item index="/log">
+          <el-icon><Document /></el-icon><span>操作日志</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -45,10 +61,23 @@
           <span class="page-name">{{ route.meta.title }}</span>
         </div>
         <div class="user-area">
+          <!-- 数据范围提示：普通成员需要明确知道自己只看得到自己的账 -->
+          <el-tag v-if="scopeLocked" type="info" size="small" effect="plain" class="scope-tag">
+            <el-icon><Lock /></el-icon>
+            仅显示我（{{ user.memberName || user.realName }}）的数据
+          </el-tag>
+          <el-tag v-else-if="isOwner" type="success" size="small" effect="plain" class="scope-tag">
+            <el-icon><View /></el-icon>
+            户主视角 · 可查看全家数据
+          </el-tag>
+
           <el-dropdown @command="onCommand">
             <span class="user-name">
               <el-icon><UserFilled /></el-icon>
               {{ user.realName || user.username }}
+              <el-tag size="small" :type="roleTagType" effect="dark" class="role-tag">
+                {{ user.roleName }}
+              </el-tag>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -64,27 +93,36 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <!-- 全局快速记账悬浮球（需求第 3 条） -->
+    <QuickAddBall />
   </el-container>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { currentUser, logout } from '../api/auth'
+import { currentUser as fetchCurrent, logout as doLogout } from '../api/auth'
+import QuickAddBall from '../components/QuickAddBall.vue'
+import { clearUser, currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, setUser, ROLE } from '../utils/auth'
 
 const route = useRoute()
 const router = useRouter()
-const user = ref(JSON.parse(sessionStorage.getItem('gjp_user') || '{}'))
 
+const user = currentUser
 const activeMenu = computed(() => route.path)
+
+const roleTagType = computed(() => {
+  if (user.value.role === ROLE.ADMIN) return 'danger'
+  if (user.value.role === ROLE.OWNER) return 'success'
+  return 'info'
+})
 
 onMounted(async () => {
   // 页面刷新后向后端确认 session 是否还在，避免本地有缓存但服务端已过期
   try {
-    const data = await currentUser()
-    user.value = data
-    sessionStorage.setItem('gjp_user', JSON.stringify(data))
+    setUser(await fetchCurrent())
   } catch (e) {
     // 401 已由 request 拦截器统一跳转，这里不再重复处理
   }
@@ -93,8 +131,8 @@ onMounted(async () => {
 async function onCommand(cmd) {
   if (cmd !== 'logout') return
   await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
-  await logout()
-  sessionStorage.removeItem('gjp_user')
+  await doLogout()
+  clearUser()
   ElMessage.success('已退出登录')
   router.replace('/login')
 }
@@ -145,6 +183,18 @@ async function onCommand(cmd) {
   color: var(--gjp-text-light);
 }
 
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.scope-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .user-name {
   display: flex;
   align-items: center;
@@ -152,6 +202,10 @@ async function onCommand(cmd) {
   cursor: pointer;
   outline: none;
   color: var(--gjp-text);
+}
+
+.role-tag {
+  margin-left: 2px;
 }
 
 .main {

@@ -22,15 +22,18 @@ public interface RecordMapper {
     String JOIN = " FROM t_record r "
             + " LEFT JOIN t_member m ON r.member_id = m.id "
             + " LEFT JOIN t_category c ON r.category_id = c.id "
-            + " LEFT JOIN t_category pc ON c.parent_id = pc.id ";
+            + " LEFT JOIN t_category pc ON c.parent_id = pc.id "
+            // rc 是所属的一级分类。三级分类改造后，只联父级只能显示"外出就餐/快餐"，
+            // 联上一级分类才能显示完整路径"餐饮支出/外出就餐/快餐"
+            + " LEFT JOIN t_category rc ON c.root_id = rc.id ";
 
     /** 动态 where 片段：与 countByQuery 完全一致，保证列表与总数口径相同 */
     String WHERE = " <where> r.family_id = #{familyId} "
             + " <if test='q.type != null'> AND r.type = #{q.type} </if>"
             + " <if test='q.memberId != null'> AND r.member_id = #{q.memberId} </if>"
-            // 分类条件：既匹配本身，也匹配以它为父分类的二级分类，这样点一级分类能看到全部明细
+            // 分类条件：匹配自身、直接子分类，以及 root_id（选一级时含全部三级明细）
             + " <if test='q.categoryId != null'> AND (r.category_id = #{q.categoryId} "
-            + "     OR c.parent_id = #{q.categoryId}) </if>"
+            + "     OR c.parent_id = #{q.categoryId} OR c.root_id = #{q.categoryId}) </if>"
             + " <if test='q.startDate != null'> AND r.record_date <![CDATA[>=]]> #{q.startDate} </if>"
             + " <if test='q.endDate != null'> AND r.record_date <![CDATA[<=]]> #{q.endDate} </if>"
             + " <if test='q.payMethod != null and q.payMethod != \"\"'> AND r.pay_method = #{q.payMethod} </if>"
@@ -44,7 +47,8 @@ public interface RecordMapper {
 
     @Select("<script>"
             + "SELECT r.*, m.member_name AS member_name, c.category_name AS category_name, "
-            + "       pc.category_name AS parent_category_name "
+            + "       pc.category_name AS parent_category_name, rc.category_name AS root_category_name, "
+            + "       c.level AS category_level "
             + JOIN
             + WHERE
             + " ORDER BY r.record_date DESC, r.id DESC "
@@ -66,7 +70,8 @@ public interface RecordMapper {
                                 @Param("type") Integer type);
 
     @Select("SELECT r.*, m.member_name AS member_name, c.category_name AS category_name, "
-            + "       pc.category_name AS parent_category_name "
+            + "       pc.category_name AS parent_category_name, rc.category_name AS root_category_name, "
+            + "       c.level AS category_level "
             + JOIN
             + " WHERE r.id = #{id} AND r.family_id = #{familyId}")
     Record selectById(@Param("id") Long id, @Param("familyId") Long familyId);

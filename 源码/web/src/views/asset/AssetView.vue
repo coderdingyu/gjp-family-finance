@@ -113,7 +113,7 @@
         </el-table-column>
       </el-table>
       <p class="text-light" style="margin: 10px 0 0">
-        说明：剩余本金按“剩余期数 × 月供”估算，且不超过贷款总额；未拆分等额本息中的利息，用于家庭记账。
+        说明：剩余本金按"剩余期数 × 月供"估算，未拆分等额本息中的利息部分，用于家庭记账场景已足够。
       </p>
     </div>
 
@@ -180,7 +180,7 @@
         </el-form-item>
         <el-form-item label="起始还款日">
           <el-date-picker v-model="loanForm.startDate" type="date" value-format="YYYY-MM-DD"
-                          :disabled-date="(d) => d > new Date()" style="width: 100%" />
+                          style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>

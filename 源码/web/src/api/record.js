@@ -5,3 +5,5 @@ export const addRecord = (data) => request.post('/record', data)
 export const updateRecord = (id, data) => request.put(`/record/${id}`, data)
 export const deleteRecord = (id) => request.delete(`/record/${id}`)
 export const recordOptions = () => request.get('/record/options')
+/** 批量删除，ids 为流水ID数组 */
+export const deleteRecordBatch = (ids) => request.delete('/record/batch', { data: ids })

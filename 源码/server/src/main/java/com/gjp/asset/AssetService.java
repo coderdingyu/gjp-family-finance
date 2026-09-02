@@ -4,6 +4,7 @@ import com.gjp.common.BizException;
 import com.gjp.common.UserContext;
 import com.gjp.entity.Asset;
 import com.gjp.entity.Loan;
+import com.gjp.log.OperationLogService;
 import com.gjp.mapper.AssetMapper;
 import com.gjp.mapper.LoanMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,10 @@ import java.util.Map;
  *
  * 家庭财务的完整图景 = 收支流水（现金流）+ 资产负债（存量）。
  * 这里给出净资产 = 资产合计 − 贷款剩余本金，让家庭知道"攒下的钱到底剩多少"。
+ *
+ * 权限（需求第 9 条）：资产和贷款是**家庭整体**的财产，不属于某个成员，
+ * 因此无法按成员切分数据范围。折中做法是整个模块仅户主可见可改，
+ * 普通成员访问直接 403，前端也不给他们显示这个菜单。
  */
 @Service
 public class AssetService {
@@ -35,21 +40,28 @@ public class AssetService {
     private AssetMapper assetMapper;
     @Autowired
     private LoanMapper loanMapper;
+    @Autowired
+    private OperationLogService logService;
 
     // ---------------- 资产 ----------------
 
     public List<Asset> listAsset() {
+        UserContext.requireOwner();
         return assetMapper.selectByFamily(UserContext.getFamilyId());
     }
 
     public Asset addAsset(Asset asset) {
+        UserContext.requireOwner();
         validateAsset(asset);
         asset.setFamilyId(UserContext.getFamilyId());
         assetMapper.insert(asset);
+        logService.record(OperationLogService.M_ASSET, OperationLogService.A_ADD, asset.getId(),
+                "新增资产【" + asset.getAssetName() + "】" + asset.getAssetType() + " " + asset.getAmount() + " 元");
         return asset;
     }
 
     public Asset updateAsset(Long id, Asset asset) {
+        UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
         if (assetMapper.selectById(id, familyId) == null) {
             throw new BizException("资产不存在");
@@ -58,15 +70,21 @@ public class AssetService {
         asset.setId(id);
         asset.setFamilyId(familyId);
         assetMapper.update(asset);
+        logService.record(OperationLogService.M_ASSET, OperationLogService.A_UPDATE, id,
+                "修改资产【" + asset.getAssetName() + "】当前价值 " + asset.getAmount() + " 元");
         return asset;
     }
 
     public void deleteAsset(Long id) {
+        UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
-        if (assetMapper.selectById(id, familyId) == null) {
+        Asset before = assetMapper.selectById(id, familyId);
+        if (before == null) {
             throw new BizException("资产不存在");
         }
         assetMapper.deleteById(id, familyId);
+        logService.record(OperationLogService.M_ASSET, OperationLogService.A_DELETE, id,
+                "删除资产【" + before.getAssetName() + "】");
     }
 
     private void validateAsset(Asset asset) {
@@ -91,6 +109,7 @@ public class AssetService {
 
     /** 贷款列表，同时算出每笔的剩余期数与剩余本金 */
     public List<Map<String, Object>> listLoan() {
+        UserContext.requireOwner();
         List<Map<String, Object>> result = new ArrayList<>();
         for (Loan loan : loanMapper.selectByFamily(UserContext.getFamilyId())) {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -134,13 +153,18 @@ public class AssetService {
     }
 
     public Loan addLoan(Loan loan) {
+        UserContext.requireOwner();
         validateLoan(loan);
         loan.setFamilyId(UserContext.getFamilyId());
         loanMapper.insert(loan);
+        logService.record(OperationLogService.M_LOAN, OperationLogService.A_ADD, loan.getId(),
+                "新增贷款【" + loan.getLoanName() + "】" + loan.getLoanType()
+                        + " 总额 " + loan.getTotalAmount() + " 元，月供 " + loan.getMonthlyPayment() + " 元");
         return loan;
     }
 
     public Loan updateLoan(Long id, Loan loan) {
+        UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
         if (loanMapper.selectById(id, familyId) == null) {
             throw new BizException("贷款记录不存在");
@@ -149,15 +173,21 @@ public class AssetService {
         loan.setId(id);
         loan.setFamilyId(familyId);
         loanMapper.update(loan);
+        logService.record(OperationLogService.M_LOAN, OperationLogService.A_UPDATE, id,
+                "修改贷款【" + loan.getLoanName() + "】已还 " + loan.getPaidMonths() + "/" + loan.getTotalMonths() + " 期");
         return loan;
     }
 
     public void deleteLoan(Long id) {
+        UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
-        if (loanMapper.selectById(id, familyId) == null) {
+        Loan before = loanMapper.selectById(id, familyId);
+        if (before == null) {
             throw new BizException("贷款记录不存在");
         }
         loanMapper.deleteById(id, familyId);
+        logService.record(OperationLogService.M_LOAN, OperationLogService.A_DELETE, id,
+                "删除贷款【" + before.getLoanName() + "】");
     }
 
     private void validateLoan(Loan loan) {
@@ -191,6 +221,7 @@ public class AssetService {
 
     /** 资产负债总览：资产合计、贷款剩余合计、净资产、按类型的资产构成 */
     public Map<String, Object> summary() {
+        UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
         List<Asset> assets = assetMapper.selectByFamily(familyId);
         List<Loan> loans = loanMapper.selectByFamily(familyId);

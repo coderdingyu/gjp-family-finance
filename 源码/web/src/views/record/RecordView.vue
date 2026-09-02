@@ -15,7 +15,13 @@
           </el-col>
           <el-col :md="6" :sm="12">
             <el-form-item label="成员">
-              <el-select v-model="query.memberId" placeholder="全部" clearable style="width: 100%">
+              <el-select
+                v-model="query.memberId"
+                :placeholder="scopeLocked ? '仅本人' : '全部'"
+                :disabled="scopeLocked"
+                clearable
+                style="width: 100%"
+              >
                 <el-option v-for="m in members" :key="m.id" :label="m.memberName" :value="m.id" />
               </el-select>
             </el-form-item>
@@ -116,6 +122,9 @@
             ¥{{ money(sumIncome - sumExpense) }}
           </b>
         </span>
+        <span v-if="scopeLocked" class="scope-note">
+          <el-icon><Lock /></el-icon> 以上仅统计我名下的流水
+        </span>
       </div>
 
       <el-table :data="list" v-loading="loading" border stripe size="small" empty-text="没有符合条件的流水">
@@ -128,10 +137,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="memberName" label="成员" width="88" />
-        <el-table-column label="分类" min-width="140">
+        <el-table-column label="分类" min-width="180">
           <template #default="{ row }">
-            <span v-if="row.parentCategoryName" class="text-light">{{ row.parentCategoryName }} / </span>
-            {{ row.categoryName }}
+            <span class="text-light">{{ categoryPrefix(row) }}</span>{{ row.categoryName }}
           </template>
         </el-table-column>
         <el-table-column label="金额" width="118" align="right">
@@ -184,7 +192,8 @@
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="家庭成员" prop="memberId">
-              <el-select v-model="form.memberId" placeholder="请选择" style="width: 100%">
+              <el-select v-model="form.memberId" placeholder="请选择" :disabled="scopeLocked"
+                         style="width: 100%">
                 <el-option
                   v-for="m in members"
                   :key="m.id"
@@ -212,7 +221,7 @@
             v-model="form.categoryPath"
             :options="formCategoryOptions"
             :props="{ checkStrictly: false, value: 'id', label: 'categoryName', children: 'children' }"
-            placeholder="请选择到二级分类"
+            placeholder="请选择到末级分类（如 游戏充值 / KTV）"
             style="width: 100%"
           />
         </el-form-item>
@@ -287,13 +296,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
 import { addRecord, deleteRecord, pageRecord, recordOptions, updateRecord } from '../../api/record'
 import { listMember } from '../../api/member'
 import { treeCategory } from '../../api/category'
 import { money, today, typeText } from '../../utils/format'
+import { currentUser, scopeLocked } from '../../utils/auth'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -345,7 +355,8 @@ function emptyForm() {
   return {
     id: null,
     type: 2,
-    memberId: null,
+    // 普通成员只能给自己记账，直接预填自己
+    memberId: scopeLocked.value ? currentUser.value.memberId : null,
     categoryPath: [],
     amount: null,
     recordDate: today(),
@@ -365,12 +376,36 @@ const rules = {
   recordDate: [{ required: true, message: '请选择发生日期', trigger: 'change' }]
 }
 
+/** 三级分类时显示"餐饮支出 / 外出就餐 / "，二级时显示"餐饮支出 / " */
+function categoryPrefix(row) {
+  const parts = []
+  if ((row.categoryLevel || 1) >= 3 && row.rootCategoryName) {
+    parts.push(row.rootCategoryName)
+  }
+  if (row.parentCategoryName) {
+    parts.push(row.parentCategoryName)
+  }
+  return parts.length ? parts.join(' / ') + ' / ' : ''
+}
+
+/** 悬浮球记完账后会派发这个事件，列表跟着刷新，二者不需要相互引用 */
+function onExternalChange() {
+  load()
+}
+
 onMounted(async () => {
   members.value = await listMember()
   categoryTree.value = await treeCategory()
   options.value = await recordOptions()
+  // 普通成员的成员筛选锁死为自己
+  if (scopeLocked.value) {
+    query.value.memberId = currentUser.value.memberId
+  }
+  window.addEventListener('gjp:record-changed', onExternalChange)
   await load()
 })
+
+onBeforeUnmount(() => window.removeEventListener('gjp:record-changed', onExternalChange))
 
 async function load() {
   loading.value = true
@@ -400,6 +435,9 @@ function reset() {
   const size = query.value.pageSize
   query.value = emptyQuery()
   query.value.pageSize = size
+  if (scopeLocked.value) {
+    query.value.memberId = currentUser.value.memberId
+  }
   dateRange.value = []
   queryCategory.value = []
   load()
@@ -415,8 +453,8 @@ function openEdit(row) {
     id: row.id,
     type: row.type,
     memberId: row.memberId,
-    // 编辑时把分类还原成级联需要的路径：有父分类就是两级，否则一级
-    categoryPath: row.parentCategoryName ? [findParentId(row.categoryId), row.categoryId] : [row.categoryId],
+    // 编辑时把分类还原成级联需要的路径，最深三层
+    categoryPath: buildPath(row.categoryId),
     amount: Number(row.amount),
     recordDate: row.recordDate,
     merchant: row.merchant,
@@ -428,14 +466,21 @@ function openEdit(row) {
   dialog.value = true
 }
 
-/** 从已加载的分类树里反查某个二级分类的父分类ID，避免为此再发一次请求 */
-function findParentId(categoryId) {
-  for (const parent of categoryTree.value) {
-    if ((parent.children || []).some((c) => c.id === categoryId)) {
-      return parent.id
+/**
+ * 从已加载的分类树里反查某个分类的完整路径（用于回填级联选择器）。
+ * 树是三层的，用一次深度优先遍历拿到路径，避免为此再发请求。
+ */
+function buildPath(categoryId) {
+  const walk = (nodes, trail) => {
+    for (const n of nodes || []) {
+      const next = [...trail, n.id]
+      if (n.id === categoryId) return next
+      const found = walk(n.children, next)
+      if (found) return found
     }
+    return null
   }
-  return null
+  return walk(categoryTree.value, []) || [categoryId]
 }
 
 function onTypeChange() {
@@ -503,6 +548,14 @@ async function onDelete(row) {
   color: var(--gjp-text);
   font-size: 15px;
   margin-left: 4px;
+}
+
+.summary .scope-note {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gjp-text-light);
 }
 
 .pager {

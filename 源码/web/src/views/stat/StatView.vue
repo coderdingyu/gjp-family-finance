@@ -6,6 +6,7 @@
         <span class="text-light">只呈现客观汇总数据；问题诊断请看"智能分析"</span>
       </div>
       <div class="tools">
+        <MemberScope v-model="memberId" @change="load" />
         <el-radio-group v-model="type" size="small" @change="load">
           <el-radio-button :value="2">支出</el-radio-button>
           <el-radio-button :value="1">收入</el-radio-button>
@@ -85,7 +86,9 @@
       </el-col>
       <el-col :md="12">
         <div class="page-card">
-          <h3 class="card-title">成员{{ typeName }}对比</h3>
+          <h3 class="card-title">
+            {{ memberId ? `所选成员${typeName}合计` : `成员${typeName}对比` }}
+          </h3>
           <EChart :option="memberOption" :empty="!memberRows.length" height="300px" />
         </div>
       </el-col>
@@ -135,6 +138,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import EChart from '../../components/EChart.vue'
+import MemberScope from '../../components/MemberScope.vue'
 import {
   areaStat,
   categoryStat,
@@ -149,6 +153,7 @@ import { CHART_COLORS, money, toDateStr } from '../../utils/format'
 const loading = ref(false)
 const type = ref(2)
 const range = ref(defaultRange())
+const memberId = ref(null)
 
 const trendRows = ref([])
 const cats = ref([])
@@ -181,10 +186,13 @@ function quick(kind) {
   load()
 }
 
-const params = computed(() => ({
-  startDate: range.value?.[0],
-  endDate: range.value?.[1]
-}))
+const params = computed(() => {
+  const p = { startDate: range.value?.[0], endDate: range.value?.[1] }
+  if (memberId.value) {
+    p.memberId = memberId.value
+  }
+  return p
+})
 
 onMounted(load)
 

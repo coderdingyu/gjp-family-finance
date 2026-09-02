@@ -17,6 +17,12 @@ public class Category {
     /** 父分类ID，0 表示一级分类 */
     private Long parentId;
 
+    /** 所属一级分类ID，一级分类为自身ID */
+    private Long rootId;
+
+    /** 层级：1=一级 2=二级 3=三级 */
+    private Integer level;
+
     /** 分类名称 */
     private String categoryName;
 
@@ -60,6 +66,22 @@ public class Category {
 
     public void setParentId(Long parentId) {
         this.parentId = parentId;
+    }
+
+    public Long getRootId() {
+        return rootId;
+    }
+
+    public void setRootId(Long rootId) {
+        this.rootId = rootId;
+    }
+
+    public Integer getLevel() {
+        return level;
+    }
+
+    public void setLevel(Integer level) {
+        this.level = level;
     }
 
     public String getCategoryName() {

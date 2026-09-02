@@ -19,11 +19,29 @@ public class User {
     /** 真实姓名 */
     private String realName;
 
-    /** 所属家庭ID */
+    /** 所属家庭ID，系统管理员为 0 */
     private Long familyId;
+
+    /** 绑定的家庭成员ID，普通成员据此做数据隔离 */
+    private Long memberId;
+
+    /** 角色：0=普通成员 1=户主 2=系统管理员 */
+    private Integer role;
+
+    /** 状态：1=正常 0=已禁用 */
+    private Integer status;
+
+    /** 最后登录时间 */
+    private LocalDateTime lastLogin;
 
     /** 创建时间 */
     private LocalDateTime createTime;
+
+    /** 绑定成员的姓名，联表查询用，非数据库字段 */
+    private String memberName;
+
+    /** 所属家庭名称，管理员列表用，非数据库字段 */
+    private String familyName;
 
     public Long getId() {
         return id;
@@ -63,6 +81,54 @@ public class User {
 
     public void setFamilyId(Long familyId) {
         this.familyId = familyId;
+    }
+
+    public Long getMemberId() {
+        return memberId;
+    }
+
+    public void setMemberId(Long memberId) {
+        this.memberId = memberId;
+    }
+
+    public Integer getRole() {
+        return role;
+    }
+
+    public void setRole(Integer role) {
+        this.role = role;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getLastLogin() {
+        return lastLogin;
+    }
+
+    public void setLastLogin(LocalDateTime lastLogin) {
+        this.lastLogin = lastLogin;
+    }
+
+    public String getMemberName() {
+        return memberName;
+    }
+
+    public void setMemberName(String memberName) {
+        this.memberName = memberName;
+    }
+
+    public String getFamilyName() {
+        return familyName;
+    }
+
+    public void setFamilyName(String familyName) {
+        this.familyName = familyName;
     }
 
     public LocalDateTime getCreateTime() {

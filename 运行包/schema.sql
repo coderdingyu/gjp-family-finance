@@ -24,16 +24,27 @@ CREATE TABLE t_family (
 
 -- ------------------------------------------------------------
 -- 2. 用户表（登录账号）
+--    role 决定数据可见范围，是整个权限模型的基础：
+--      0 普通成员   只能看自己名下的流水与统计，看不到资产负债
+--      1 户主       可以看全家所有成员的数据，可管理成员与分类
+--      2 系统管理员 跨家庭，只用于网站维护与日志查看，不参与记账
+--    member_id 把登录账号绑定到具体家庭成员，普通成员的数据隔离就靠它。
+--    系统管理员不属于任何家庭，family_id = 0、member_id 为空。
 -- ------------------------------------------------------------
 CREATE TABLE t_user (
     id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     username     VARCHAR(50)  NOT NULL                COMMENT '登录账号',
     password     VARCHAR(100) NOT NULL                COMMENT '密码（MD5加密存储）',
     real_name    VARCHAR(50)           DEFAULT NULL   COMMENT '真实姓名',
-    family_id    BIGINT       NOT NULL                COMMENT '所属家庭ID',
+    family_id    BIGINT       NOT NULL                COMMENT '所属家庭ID，系统管理员为 0',
+    member_id    BIGINT                DEFAULT NULL   COMMENT '绑定的家庭成员ID，普通成员据此做数据隔离',
+    role         TINYINT      NOT NULL DEFAULT 0      COMMENT '角色：0=普通成员 1=户主 2=系统管理员',
+    status       TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1=正常 0=已禁用（禁用后不能登录）',
+    last_login   DATETIME              DEFAULT NULL   COMMENT '最后登录时间',
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username)
+    UNIQUE KEY uk_username (username),
+    KEY idx_family (family_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '用户表';
 
 -- ------------------------------------------------------------
@@ -51,20 +62,30 @@ CREATE TABLE t_member (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '家庭成员表';
 
 -- ------------------------------------------------------------
--- 4. 收支分类表（支持二级自定义分类）    【乙 负责的模块】
---    parent_id = 0 表示一级分类
+-- 4. 收支分类表（支持三级自定义分类）    【乙 负责的模块】
+--    parent_id = 0 表示一级分类；level 冗余存层级，避免统计时反复递归查父级
+--    例：文化娱乐(1级) → 影音娱乐(2级) → 游戏充值 / KTV(3级)
+--
+--    root_id 是本分类所属的一级分类ID（一级分类的 root_id 就是自己）。
+--    加这个字段是为了让统计按一级分类汇总时只用一次 JOIN，
+--    否则三级分类要连续 JOIN 两次父表才能找到顶级，SQL 会明显变复杂。
+--    维护逻辑集中在 CategoryService 里，插入时一次算好。
 -- ------------------------------------------------------------
 CREATE TABLE t_category (
     id             BIGINT      NOT NULL AUTO_INCREMENT COMMENT '分类ID',
     family_id      BIGINT      NOT NULL               COMMENT '所属家庭ID',
     parent_id      BIGINT      NOT NULL DEFAULT 0     COMMENT '父分类ID，0表示一级分类',
+    root_id        BIGINT      NOT NULL DEFAULT 0     COMMENT '所属一级分类ID，一级分类为自身ID',
+    level          TINYINT     NOT NULL DEFAULT 1     COMMENT '层级：1=一级 2=二级 3=三级',
     category_name  VARCHAR(50) NOT NULL               COMMENT '分类名称',
     type           TINYINT     NOT NULL               COMMENT '类型：1=收入 2=支出',
     is_default     TINYINT     NOT NULL DEFAULT 0     COMMENT '是否系统预置：1=预置(不可删) 0=用户自定义',
     sort_no        INT         NOT NULL DEFAULT 0     COMMENT '排序号',
     create_time    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
-    KEY idx_family_type (family_id, type)
+    KEY idx_family_type (family_id, type),
+    KEY idx_parent (parent_id),
+    KEY idx_root (root_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '收支分类表';
 
 -- ------------------------------------------------------------
@@ -126,3 +147,37 @@ CREATE TABLE t_loan (
     PRIMARY KEY (id),
     KEY idx_family (family_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '贷款表';
+
+-- ------------------------------------------------------------
+-- 8. 操作日志表    【第一批新增，对应需求第 7、8 条】
+--    记录谁在什么时候动了哪条数据，以及文件导入的情况。
+--    设计取舍：
+--      · 只记录"写"操作（新增/修改/删除/导入/登录），不记录查询。
+--        查询量是写操作的几十倍，全记会让日志表迅速变成整个库最大的表，
+--        而对排查问题几乎没有帮助。
+--      · detail 存 JSON 文本而不是拆成一堆列，因为不同模块要记的字段差别很大
+--        （流水记金额和分类，导入记文件名和成功条数），拆列会出现大量空字段。
+--      · family_id = 0 表示与家庭无关的系统级操作（如管理员登录）。
+--    普通成员只能看到自己的日志，户主能看全家，系统管理员看全部。
+-- ------------------------------------------------------------
+CREATE TABLE t_operation_log (
+    id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    family_id    BIGINT       NOT NULL DEFAULT 0      COMMENT '所属家庭ID，0=系统级操作',
+    user_id      BIGINT                DEFAULT NULL   COMMENT '操作人用户ID',
+    username     VARCHAR(50)           DEFAULT NULL   COMMENT '操作人账号（冗余，用户删除后日志仍可读）',
+    real_name    VARCHAR(50)           DEFAULT NULL   COMMENT '操作人姓名（冗余）',
+    module       VARCHAR(20)  NOT NULL                COMMENT '模块：流水/成员/分类/资产/贷款/导入/登录/管理员',
+    action       VARCHAR(20)  NOT NULL                COMMENT '动作：新增/修改/删除/导入/登录/退出/重置密码/启用/禁用',
+    target_id    BIGINT                DEFAULT NULL   COMMENT '被操作对象的ID',
+    summary      VARCHAR(255)          DEFAULT NULL   COMMENT '一句话摘要，日志列表直接显示这一列',
+    detail       TEXT                                 COMMENT '详细内容，JSON 文本',
+    ip           VARCHAR(50)           DEFAULT NULL   COMMENT '操作来源IP',
+    success      TINYINT      NOT NULL DEFAULT 1      COMMENT '是否成功：1=成功 0=失败',
+    error_msg    VARCHAR(500)          DEFAULT NULL   COMMENT '失败原因',
+    cost_ms      INT                   DEFAULT NULL   COMMENT '耗时（毫秒）',
+    create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    PRIMARY KEY (id),
+    KEY idx_family_time (family_id, create_time),
+    KEY idx_user (user_id),
+    KEY idx_module (module, action)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '操作日志表';

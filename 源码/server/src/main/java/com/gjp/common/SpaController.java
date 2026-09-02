@@ -28,7 +28,13 @@ public class SpaController {
             "/analysis",
             "/asset",
             "/member",
-            "/category"
+            "/category",
+            "/accounts",
+            "/dedup",
+            "/log",
+            "/admin",
+            "/admin/users",
+            "/admin/families"
     })
     public String index() {
         return "forward:/index.html";

@@ -3,10 +3,11 @@
     <!-- 区间选择 -->
     <div class="page-card toolbar">
       <div>
-        <span class="card-title inline">家庭收支看板</span>
+        <span class="card-title inline">{{ boardTitle }}</span>
         <span class="text-light">统计区间：{{ data.range || '—' }}</span>
       </div>
-      <div>
+      <div class="tools">
+        <MemberScope v-model="memberId" @change="load" />
         <el-radio-group v-model="mode" @change="onModeChange" size="small">
           <el-radio-button value="year">按年</el-radio-button>
           <el-radio-button value="month">按月</el-radio-button>
@@ -45,7 +46,7 @@
                   :sub="`月均 ¥${money(ov.avgMonthlyExpense)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="家庭结余" :value="ov.balance"
+        <StatCard :label="data.memberId ? '本人结余' : '家庭结余'" :value="ov.balance"
                   :color="Number(ov.balance) >= 0 ? '#2e7d5b' : '#d9534f'"
                   :sub="`结余率 ${balanceRate}%`" />
       </el-col>
@@ -75,7 +76,9 @@
     <el-row :gutter="14">
       <el-col :md="12">
         <div class="page-card">
-          <h3 class="card-title">成员支出对比</h3>
+          <h3 class="card-title">
+            {{ data.memberId ? '本人支出合计' : '成员支出对比' }}
+          </h3>
           <EChart :option="memberBarOption" :empty="!data.memberExpense?.length" height="300px" />
         </div>
       </el-col>
@@ -132,6 +135,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import EChart from '../../components/EChart.vue'
+import MemberScope from '../../components/MemberScope.vue'
 import StatCard from '../../components/StatCard.vue'
 import { dashboard } from '../../api/stat'
 import { CHART_COLORS, currentMonth, currentYear, money } from '../../utils/format'
@@ -141,8 +145,16 @@ const data = ref({})
 const mode = ref('year')
 const year = ref(String(currentYear()))
 const month = ref(currentMonth())
+/** 户主选择要查看的成员；不选表示全家汇总。普通成员由后端强制成自己 */
+const memberId = ref(null)
 
 const ov = computed(() => data.value.overview || {})
+
+/** 标题随数据范围变化，避免只看一个人的数据却写着"家庭收支" */
+const boardTitle = computed(() => {
+  if (data.value.memberName) return `${data.value.memberName} 的收支看板`
+  return '家庭收支看板'
+})
 
 const balanceRate = computed(() => {
   const income = Number(ov.value.totalIncome || 0)
@@ -163,6 +175,9 @@ async function load() {
       mode.value === 'year'
         ? { year: Number(year.value) }
         : { year: Number(month.value.slice(0, 4)), month: Number(month.value.slice(5, 7)) }
+    if (memberId.value) {
+      params.memberId = memberId.value
+    }
     data.value = await dashboard(params)
   } finally {
     loading.value = false
@@ -296,6 +311,15 @@ const merchantBarOption = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toolbar .tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .card-title.inline {

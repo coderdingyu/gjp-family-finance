@@ -4,6 +4,11 @@ package com.gjp.common;
  * 当前登录用户上下文。登录拦截器在请求进来时写入，请求结束时清理。
  * 各 Service 通过 UserContext.getFamilyId() 拿到家庭ID，从而做到数据按家庭隔离，
  * 不用每个接口都从前端传 familyId（前端传的不可信）。
+ *
+ * 权限判断也统一走这里，核心是 {@link #scopeMemberId()}：
+ * 它返回 null 表示"能看全家"，返回成员ID表示"只能看这个成员"。
+ * 所有查询类 Service 都用它来收敛数据范围，这样权限逻辑只有一处，
+ * 不会出现某个接口忘了加限制导致越权。
  */
 public class UserContext {
 
@@ -37,6 +42,90 @@ public class UserContext {
         return u.getFamilyId();
     }
 
+    public static int getRole() {
+        LoginUser u = HOLDER.get();
+        if (u == null) {
+            throw new BizException(401, "未登录");
+        }
+        return u.getRole() == null ? Role.MEMBER : u.getRole();
+    }
+
+    /** 是否系统管理员 */
+    public static boolean isAdmin() {
+        return getRole() == Role.ADMIN;
+    }
+
+    /**
+     * 是否家庭户主。
+     *
+     * 注意这里是**严格相等**而不是 role >= OWNER：系统管理员不是任何家庭的户主，
+     * 它 family_id = 0、不绑定成员，让它通过户主校验会导致它能往"0 号家庭"里写业务数据，
+     * 是一个真实的越权口子。管理员的权限由 {@link #requireAdmin()} 单独把关。
+     */
+    public static boolean isOwner() {
+        return getRole() == Role.OWNER;
+    }
+
+    /**
+     * 数据可见范围。
+     *
+     * @return null 表示可以看全家所有成员；非 null 表示只能看这一个成员的数据。
+     */
+    public static Long scopeMemberId() {
+        LoginUser u = HOLDER.get();
+        if (u == null) {
+            throw new BizException(401, "未登录");
+        }
+        int role = u.getRole() == null ? Role.MEMBER : u.getRole();
+        if (role == Role.ADMIN) {
+            // 管理员不属于任何家庭，调业务接口是没有意义的，直接挡住比返回空列表更清晰
+            throw new BizException(403, "系统管理员不参与记账，请使用管理员界面");
+        }
+        if (role == Role.OWNER) {
+            return null;
+        }
+        if (u.getMemberId() == null) {
+            // 普通成员没有绑定家庭成员时，宁可什么都看不到，也不能放开成全家可见
+            throw new BizException(403, "当前账号未绑定家庭成员，请联系户主处理");
+        }
+        return u.getMemberId();
+    }
+
+    /**
+     * 要求是家庭内的角色（普通成员或户主）。
+     * 所有业务接口都应该先过这一关，把系统管理员挡在业务数据之外。
+     */
+    public static void requireFamilyMember() {
+        if (isAdmin()) {
+            throw new BizException(403, "系统管理员不参与记账，请使用管理员界面");
+        }
+    }
+
+    /**
+     * 把前端请求的成员ID收敛到允许的范围内。
+     *
+     * 普通成员：无论前端传什么，一律强制成自己，防止改请求参数越权看别人的账。
+     * 户主/管理员：按前端传的走，传空表示看全家汇总。
+     */
+    public static Long resolveMemberId(Long requested) {
+        Long scope = scopeMemberId();
+        return scope != null ? scope : requested;
+    }
+
+    /** 要求户主及以上权限，否则抛 403 */
+    public static void requireOwner() {
+        if (!isOwner()) {
+            throw new BizException(403, "该操作仅户主可用");
+        }
+    }
+
+    /** 要求系统管理员权限，否则抛 403 */
+    public static void requireAdmin() {
+        if (!isAdmin()) {
+            throw new BizException(403, "该操作仅系统管理员可用");
+        }
+    }
+
     /** 存在 session 中的登录态，字段刻意保持精简 */
     public static class LoginUser {
         private Long userId;
@@ -44,6 +133,14 @@ public class UserContext {
         private String realName;
         private Long familyId;
         private String familyName;
+        /** 绑定的家庭成员ID，普通成员的数据隔离依据 */
+        private Long memberId;
+        /** 绑定成员姓名，前端顶栏显示用 */
+        private String memberName;
+        /** 角色：0=普通成员 1=户主 2=系统管理员 */
+        private Integer role;
+        /** 角色中文名，前端直接显示 */
+        private String roleName;
 
         public LoginUser() {
         }
@@ -54,6 +151,39 @@ public class UserContext {
             this.realName = realName;
             this.familyId = familyId;
             this.familyName = familyName;
+        }
+
+        public Long getMemberId() {
+            return memberId;
+        }
+
+        public void setMemberId(Long memberId) {
+            this.memberId = memberId;
+        }
+
+        public String getMemberName() {
+            return memberName;
+        }
+
+        public void setMemberName(String memberName) {
+            this.memberName = memberName;
+        }
+
+        public Integer getRole() {
+            return role;
+        }
+
+        public void setRole(Integer role) {
+            this.role = role;
+            this.roleName = Role.name(role);
+        }
+
+        public String getRoleName() {
+            return roleName;
+        }
+
+        public void setRoleName(String roleName) {
+            this.roleName = roleName;
         }
 
         public Long getUserId() {

@@ -53,13 +53,19 @@ public class AnalysisService {
     /**
      * 生成分析报告。返回列表按严重程度排序：danger 在前，good 在后，
      * 前端直接按顺序渲染即可。
+     *
+     * memberId 与统计接口同义：普通成员只能分析自己的数据，
+     * 户主传空分析全家、传成员ID分析单人。
      */
-    public List<AnalysisItem> report(DateRange range) {
+    public List<AnalysisItem> report(DateRange range, Long requestedMemberId) {
+        Long memberId = UserContext.resolveMemberId(requestedMemberId);
         List<AnalysisItem> items = new ArrayList<>();
 
-        List<MonthAmount> trend = statService.trend(range);
-        BigDecimal totalIncome = statMapper.sumAmount(UserContext.getFamilyId(), 1, range.getStart(), range.getEnd());
-        BigDecimal totalExpense = statMapper.sumAmount(UserContext.getFamilyId(), 2, range.getStart(), range.getEnd());
+        List<MonthAmount> trend = statService.trend(range, requestedMemberId);
+        BigDecimal totalIncome = statMapper.sumAmount(
+                UserContext.getFamilyId(), 1, range.getStart(), range.getEnd(), memberId);
+        BigDecimal totalExpense = statMapper.sumAmount(
+                UserContext.getFamilyId(), 2, range.getStart(), range.getEnd(), memberId);
 
         if (totalIncome.compareTo(BigDecimal.ZERO) == 0 && totalExpense.compareTo(BigDecimal.ZERO) == 0) {
             items.add(new AnalysisItem("A0", "info", "所选区间内没有收支记录",
@@ -68,14 +74,14 @@ public class AnalysisService {
             return items;
         }
 
-        analyzeAbnormalMonth(items, trend, range);
+        analyzeAbnormalMonth(items, trend, range, memberId);
         analyzeMonthOnMonth(items, trend);
         analyzeBalanceRate(items, totalIncome, totalExpense);
-        analyzeBudget(items, range);
-        analyzeCategoryConcentration(items, range, totalExpense);
-        analyzeMerchant(items, range);
-        analyzeArea(items, range);
-        analyzeGift(items, range, totalExpense);
+        analyzeBudget(items, range, requestedMemberId);
+        analyzeCategoryConcentration(items, range, totalExpense, requestedMemberId);
+        analyzeMerchant(items, range, requestedMemberId);
+        analyzeArea(items, range, requestedMemberId);
+        analyzeGift(items, range, totalExpense, memberId);
 
         items.sort((a, b) -> weight(a.getLevel()) - weight(b.getLevel()));
         return items;
@@ -100,7 +106,8 @@ public class AnalysisService {
      * 命中阈值后再钻取到分类层，找出这个月比平常多花的钱主要花在哪一类上，
      * 并根据该分类在其他月份是否也高频出现，判断这笔支出是偶发还是会持续。
      */
-    private void analyzeAbnormalMonth(List<AnalysisItem> items, List<MonthAmount> trend, DateRange range) {
+    private void analyzeAbnormalMonth(List<AnalysisItem> items, List<MonthAmount> trend,
+                                      DateRange range, Long memberId) {
         List<MonthAmount> withData = completeMonthsWithExpense(trend);
         if (withData.size() < 2) {
             return;
@@ -131,9 +138,9 @@ public class AnalysisService {
         YearMonth peakMonth = YearMonth.parse(peak.getYm());
         Map<String, BigDecimal> peakByCat = toMap(statMapper.selectExpenseByCategory(
                 UserContext.getFamilyId(), DateRange.ofMonth(peakMonth).getStart(),
-                DateRange.ofMonth(peakMonth).getEnd()));
+                DateRange.ofMonth(peakMonth).getEnd(), memberId));
         Map<String, BigDecimal> allByCat = toMap(statMapper.selectExpenseByCategory(
-                UserContext.getFamilyId(), range.getStart(), range.effectiveEnd()));
+                UserContext.getFamilyId(), range.getStart(), range.effectiveEnd(), memberId));
 
         String topCat = null;
         BigDecimal topGap = BigDecimal.ZERO;
@@ -239,7 +246,7 @@ public class AnalysisService {
      * A4 成员预算执行。按年/自定义区间时扫描区间内每一个月（截到今天），
      * 避免只看区间末日（12 月）而漏掉 5 月已经发生的超支。
      */
-    private void analyzeBudget(List<AnalysisItem> items, DateRange range) {
+    private void analyzeBudget(List<AnalysisItem> items, DateRange range, Long requestedMemberId) {
         YearMonth cursor = YearMonth.from(range.getStart());
         YearMonth last = YearMonth.from(range.effectiveEnd());
         Map<String, List<String>> over = new LinkedHashMap<>();
@@ -247,7 +254,7 @@ public class AnalysisService {
 
         for (YearMonth ym = cursor; !ym.isAfter(last); ym = ym.plusMonths(1)) {
             boolean skipNear = DateRange.isIncompleteMonth(ym);
-            for (BudgetVO b : statService.budgetStat(ym)) {
+            for (BudgetVO b : statService.budgetStat(ym, requestedMemberId)) {
                 if ("未设预算".equals(b.getStatus())) {
                     continue;
                 }
@@ -294,11 +301,12 @@ public class AnalysisService {
     }
 
     /** A5 支出结构集中度：占比最高的一级分类。 */
-    private void analyzeCategoryConcentration(List<AnalysisItem> items, DateRange range, BigDecimal totalExpense) {
+    private void analyzeCategoryConcentration(List<AnalysisItem> items, DateRange range,
+                                              BigDecimal totalExpense, Long requestedMemberId) {
         if (totalExpense.compareTo(BigDecimal.ZERO) == 0) {
             return;
         }
-        List<AmountItem> cats = statService.categoryStat(2, range);
+        List<AmountItem> cats = statService.categoryStat(2, range, requestedMemberId);
         if (cats.isEmpty()) {
             return;
         }
@@ -319,8 +327,8 @@ public class AnalysisService {
     }
 
     /** A6 商家消费集中度，回答"钱主要花在哪些商家"。 */
-    private void analyzeMerchant(List<AnalysisItem> items, DateRange range) {
-        List<AmountItem> ranks = statService.merchantRank(range, 5);
+    private void analyzeMerchant(List<AnalysisItem> items, DateRange range, Long requestedMemberId) {
+        List<AmountItem> ranks = statService.merchantRank(range, 5, requestedMemberId);
         if (ranks.isEmpty()) {
             items.add(new AnalysisItem("A6", "info", "流水中很少填写商家信息，无法分析消费流向",
                     "区间内没有可用于统计的商家数据。",
@@ -348,8 +356,8 @@ public class AnalysisService {
     }
 
     /** A7 消费片区分布，回答"消费主要集中在哪个片区"。 */
-    private void analyzeArea(List<AnalysisItem> items, DateRange range) {
-        List<AmountItem> areas = statService.areaStat(range);
+    private void analyzeArea(List<AnalysisItem> items, DateRange range, Long requestedMemberId) {
+        List<AmountItem> areas = statService.areaStat(range, requestedMemberId);
         if (areas.isEmpty()) {
             return;
         }
@@ -371,8 +379,10 @@ public class AnalysisService {
     }
 
     /** A8 人情往来专项分析，对应课程要求"朋友间礼尚往来的消费有多少"。 */
-    private void analyzeGift(List<AnalysisItem> items, DateRange range, BigDecimal totalExpense) {
-        BigDecimal gift = statMapper.sumGiftExpense(UserContext.getFamilyId(), range.getStart(), range.getEnd());
+    private void analyzeGift(List<AnalysisItem> items, DateRange range,
+                             BigDecimal totalExpense, Long memberId) {
+        BigDecimal gift = statMapper.sumGiftExpense(
+                UserContext.getFamilyId(), range.getStart(), range.getEnd(), memberId);
         if (gift.compareTo(BigDecimal.ZERO) == 0) {
             return;
         }
