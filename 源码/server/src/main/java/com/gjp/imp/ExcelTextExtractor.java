@@ -20,8 +20,8 @@ import java.util.Locale;
  */
 public final class ExcelTextExtractor {
 
-    /** Dify 回退时每块行数。微信一行很宽，太大一块会超时。 */
-    public static final int CHUNK_ROWS = 20;
+    /** 智能体回退时每块行数。通义一次能吃下更多行，少打几轮。 */
+    public static final int CHUNK_ROWS = 50;
 
     private ExcelTextExtractor() {
     }
@@ -29,6 +29,22 @@ public final class ExcelTextExtractor {
     public static List<String> chunks(byte[] bytes, String filename) {
         List<String> lines = readLines(bytes, filename);
         return chunkLines(slim(dropPreamble(lines)));
+    }
+
+    /** 未知文字 PDF 按行切块，避免整份丢给模型。 */
+    public static List<String> textChunks(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        for (String raw : text.split("\\r?\\n")) {
+            String line = raw.trim();
+            if (!line.isEmpty()) {
+                lines.add(line);
+            }
+        }
+        List<String> chunks = chunkLines(slim(dropPreamble(lines)));
+        return chunks.isEmpty() ? List.of(text) : chunks;
     }
 
     /** 去掉说明、丢掉单号后的完整表，给本地规则解析用。 */
@@ -91,10 +107,55 @@ public final class ExcelTextExtractor {
         for (String raw : text.split("\\r?\\n")) {
             String line = raw.trim();
             if (!line.isEmpty()) {
-                lines.add(line.contains("\t") ? line : line.replace(',', '\t'));
+                lines.add(normalizeCsvLine(line));
             }
         }
         return lines;
+    }
+
+    /**
+     * 支付宝 CSV 会在订单号后塞 tab，不能把 tab 当列分隔。
+     * 逗号明显更多时按 CSV 切，并去掉单元格里残留的 tab。
+     */
+    static String normalizeCsvLine(String line) {
+        int commas = count(line, ',');
+        int tabs = count(line, '\t');
+        if (commas >= 3 && commas > tabs) {
+            return String.join("\t", splitCsvCells(line.replace("\t", "")));
+        }
+        if (tabs > 0) {
+            return line;
+        }
+        return line.replace(',', '\t');
+    }
+
+    static String[] splitCsvCells(String line) {
+        List<String> cells = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean quotes = false;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (ch == '"') {
+                quotes = !quotes;
+            } else if (ch == ',' && !quotes) {
+                cells.add(cur.toString().trim());
+                cur.setLength(0);
+            } else {
+                cur.append(ch);
+            }
+        }
+        cells.add(cur.toString().trim());
+        return cells.toArray(new String[0]);
+    }
+
+    private static int count(String s, char c) {
+        int n = 0;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == c) {
+                n++;
+            }
+        }
+        return n;
     }
 
     static List<String> dropPreamble(List<String> lines) {
@@ -116,10 +177,7 @@ public final class ExcelTextExtractor {
     }
 
     static boolean looksBillHeader(String line) {
-        String h = compact(line).toLowerCase(Locale.ROOT);
-        boolean date = h.contains("日期") || h.contains("时间") || h.contains("交易日");
-        boolean money = h.contains("金额") || h.contains("amount");
-        return date && money;
+        return BillTextParser.isBillHeader(line);
     }
 
     static List<String> slim(List<String> lines) {
@@ -181,10 +239,18 @@ public final class ExcelTextExtractor {
 
     private static String decodeText(byte[] bytes) {
         String utf8 = new String(bytes, StandardCharsets.UTF_8);
+        String gbk = new String(bytes, Charset.forName("GBK"));
+        if (looksBillText(gbk) && !looksBillText(utf8)) {
+            return gbk;
+        }
         if (!utf8.contains("\uFFFD")) {
             return utf8;
         }
-        return new String(bytes, Charset.forName("GBK"));
+        return gbk;
+    }
+
+    private static boolean looksBillText(String text) {
+        return BillTextParser.looksBillText(text);
     }
 
     private static String compact(String s) {

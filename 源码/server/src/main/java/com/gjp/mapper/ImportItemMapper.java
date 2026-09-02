@@ -27,6 +27,9 @@ public interface ImportItemMapper {
     @Select("SELECT * FROM t_import_item WHERE id = #{id} AND job_id = #{jobId}")
     ImportItem selectById(@Param("id") Long id, @Param("jobId") Long jobId);
 
+    @Select("SELECT COUNT(*) FROM t_import_item WHERE file_id = #{fileId}")
+    int countByFile(@Param("fileId") Long fileId);
+
     @Update("UPDATE t_import_item SET status=#{status}, reject_reason=#{rejectReason} WHERE id=#{id}")
     int updateStatus(ImportItem item);
 }

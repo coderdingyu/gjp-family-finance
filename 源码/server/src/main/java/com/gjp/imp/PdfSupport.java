@@ -11,7 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
- * 文本型 PDF 抽出文字；没有文字层时把第一页渲成 PNG，再交给视觉模型。
+ * 文本型 PDF 抽出文字；没有文字层时把第一页渲成 PNG，再交给 Dify 读文件工具。
  */
 public final class PdfSupport {
 
@@ -28,7 +28,7 @@ public final class PdfSupport {
             if (doc.getNumberOfPages() <= 0) {
                 return Prepared.empty();
             }
-            String text = strip(doc);
+            String text = strip(doc, false);
             if (hasText(text)) {
                 return new Prepared(text, null);
             }
@@ -38,10 +38,17 @@ public final class PdfSupport {
         }
     }
 
-    private static String strip(PDDocument doc) throws IOException {
+    public static String extractText(byte[] bytes, boolean sortByPosition) {
+        try (PDDocument doc = PDDocument.load(new ByteArrayInputStream(bytes))) {
+            return strip(doc, sortByPosition);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取该 PDF：" + e.getMessage());
+        }
+    }
+
+    private static String strip(PDDocument doc, boolean sortByPosition) throws IOException {
         PDFTextStripper stripper = new PDFTextStripper();
-        // 微信证明用阅读顺序抽字才能保住「日期+时间」分行；按坐标排序会把表格挤乱。
-        stripper.setSortByPosition(false);
+        stripper.setSortByPosition(sortByPosition);
         String raw = stripper.getText(doc);
         if (raw == null) {
             return "";

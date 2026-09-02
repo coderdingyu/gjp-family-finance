@@ -2,7 +2,7 @@ package com.gjp.imp;
 
 import com.gjp.common.BizException;
 import com.gjp.common.UserContext;
-import com.gjp.dify.DifyClient;
+import com.gjp.dify.BillAgent;
 import com.gjp.dify.DifyParseResult;
 import com.gjp.entity.Category;
 import com.gjp.entity.Record;
@@ -15,6 +15,7 @@ import com.gjp.mapper.MemberMapper;
 import com.gjp.record.RecordService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 @Service
@@ -45,7 +47,7 @@ public class ImportService {
     private static final List<String> PAY_METHODS = List.of("现金", "微信", "支付宝", "银行卡", "其他");
 
     private final ImportProperties props;
-    private final DifyClient difyClient;
+    private final BillAgent billAgent;
     private final ExecutorService importExecutor;
     private final ImportJobMapper jobMapper;
     private final ImportFileMapper fileMapper;
@@ -55,15 +57,18 @@ public class ImportService {
     private final RecordService recordService;
     private final OperationLogService logService;
     private final ImportDedup importDedup;
+    private final Set<Long> cancelledJobs = ConcurrentHashMap.newKeySet();
+    private final Set<Long> cancelledFiles = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<Long, Thread> workers = new ConcurrentHashMap<>();
 
-    public ImportService(ImportProperties props, DifyClient difyClient,
+    public ImportService(ImportProperties props, BillAgent billAgent,
                          @Qualifier("importExecutor") ExecutorService importExecutor,
                          ImportJobMapper jobMapper, ImportFileMapper fileMapper, ImportItemMapper itemMapper,
                          CategoryMapper categoryMapper, MemberMapper memberMapper,
                          RecordService recordService, OperationLogService logService,
                          ImportDedup importDedup) {
         this.props = props;
-        this.difyClient = difyClient;
+        this.billAgent = billAgent;
         this.importExecutor = importExecutor;
         this.jobMapper = jobMapper;
         this.fileMapper = fileMapper;
@@ -75,11 +80,41 @@ public class ImportService {
         this.importDedup = importDedup;
     }
 
+    @PostConstruct
+    public void recoverUnfinished() {
+        for (ImportFileRow file : fileMapper.selectParsing()) {
+            int items = itemMapper.countByFile(file.getId());
+            if (items > 0 || nvl(file.getExtracted()) > 0) {
+                file.setStatus("ready");
+                file.setProgress(100);
+                if (nvl(file.getExtracted()) < items) {
+                    file.setExtracted(items);
+                }
+                fileMapper.update(file);
+            } else {
+                file.setStatus("queued");
+                file.setProgress(0);
+                file.setRejectReason(null);
+                fileMapper.update(file);
+            }
+        }
+        for (ImportJob job : jobMapper.selectUnfinished()) {
+            if ("running".equals(job.getStatus())) {
+                job.setStatus("queued");
+                job.setMessage("服务重启后继续解析");
+                jobMapper.update(job);
+            }
+            Long jobId = job.getId();
+            Long familyId = job.getFamilyId();
+            importExecutor.execute(() -> processJob(jobId, familyId));
+        }
+    }
+
     public Map<String, Object> config() {
         UserContext.requireFamilyMember();
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("configured", difyClient.configured());
-        map.put("mode", difyClient.mode());
+        map.put("configured", billAgent.configured());
+        map.put("mode", billAgent.mode());
         map.put("maxFiles", props.getMaxFiles());
         map.put("maxFileSizeMb", 12);
         map.put("accept", List.of("jpg", "jpeg", "png", "webp", "bmp", "xls", "xlsx", "csv", "pdf"));
@@ -174,8 +209,70 @@ public class ImportService {
         }
         job.setFiles(files);
         job.setItems(itemMapper.selectByJob(id));
+        repairPreview(job);
         importDedup.annotate(job);
         return job;
+    }
+
+    public List<ImportJob> list() {
+        UserContext.requireFamilyMember();
+        Long userFilter = UserContext.isOwner() ? null : UserContext.getUserId();
+        List<ImportJob> jobs = jobMapper.selectRecent(UserContext.getFamilyId(), userFilter, 500);
+        for (ImportJob job : jobs) {
+            List<ImportFileRow> files = fileMapper.selectByJob(job.getId());
+            for (ImportFileRow f : files) {
+                f.setStoredPath(null);
+            }
+            job.setFiles(files);
+            job.setItems(List.of());
+            repairPreview(job);
+        }
+        return jobs;
+    }
+
+    public ImportJob cancel(Long id) {
+        UserContext.requireFamilyMember();
+        ImportJob job = detail(id);
+        if ("importing".equals(job.getStatus())) {
+            throw new BizException("正在入库，不能取消");
+        }
+        if (!"queued".equals(job.getStatus()) && !"running".equals(job.getStatus())) {
+            throw new BizException("当前任务已经结束，不用取消");
+        }
+        cancelledJobs.add(id);
+        for (ImportFileRow file : fileMapper.selectByJob(id)) {
+            if ("queued".equals(file.getStatus()) || "parsing".equals(file.getStatus())) {
+                cancelFileRow(file, "已取消");
+                job.setDoneFiles(nvl(job.getDoneFiles()) + 1);
+            }
+        }
+        job.setStatus("cancelled");
+        job.setMessage("已取消。已经抽出的流水还在，未处理完的文件已停止。");
+        job.setFinishTime(LocalDateTime.now());
+        jobMapper.update(job);
+        interruptWorker(id);
+        return detail(id);
+    }
+
+    public ImportJob cancelFile(Long jobId, Long fileId) {
+        UserContext.requireFamilyMember();
+        ImportJob job = detail(jobId);
+        ImportFileRow file = fileMapper.selectById(fileId);
+        if (file == null || !jobId.equals(file.getJobId())) {
+            throw new BizException("文件不存在");
+        }
+        if (!"queued".equals(file.getStatus()) && !"parsing".equals(file.getStatus())) {
+            throw new BizException("这个文件已经处理完了");
+        }
+        if ("importing".equals(job.getStatus())) {
+            throw new BizException("正在入库，不能取消");
+        }
+        cancelledFiles.add(fileId);
+        boolean parsing = "parsing".equals(file.getStatus());
+        cancelFileRow(file, parsing ? "已取消，智能体结果不会写入待确认" : "已取消");
+        job.setDoneFiles(nvl(job.getDoneFiles()) + 1);
+        jobMapper.update(job);
+        return detail(jobId);
     }
 
     public ImportJob confirm(Long id, List<Long> itemIds, boolean merge) {
@@ -189,6 +286,10 @@ public class ImportService {
         }
         if ("failed".equals(job.getStatus())) {
             throw new BizException("该任务已失败，不能入库");
+        }
+        if ("cancelled".equals(job.getStatus()) && itemMapper.selectByJob(id).stream()
+                .noneMatch(i -> "pending".equals(i.getStatus()))) {
+            throw new BizException("该任务已取消，没有待确认的流水");
         }
         List<ImportItem> candidates = new ArrayList<>();
         if (itemIds == null) {
@@ -265,34 +366,79 @@ public class ImportService {
     }
 
     private void processJob(Long jobId, Long familyId) {
+        workers.put(jobId, Thread.currentThread());
         ImportJob job = jobMapper.selectById(jobId, familyId);
         if (job == null) {
+            workers.remove(jobId);
             return;
         }
         try {
+            if (jobStopped(jobId) || "cancelled".equals(job.getStatus())) {
+                finalizeCancel(job);
+                return;
+            }
             job.setStatus("running");
             jobMapper.update(job);
             CategoryBinder binder = CategoryBinder.from(categoryMapper.selectByFamily(familyId, null));
-            String categories = binder.listText();
+            String categories = binder.listCompact();
             for (ImportFileRow file : fileMapper.selectByJob(jobId)) {
+                if (jobStopped(jobId) || Thread.currentThread().isInterrupted()) {
+                    skipRemaining(jobId);
+                    break;
+                }
+                if (fileStopped(file.getId())) {
+                    if ("queued".equals(file.getStatus()) || "parsing".equals(file.getStatus())) {
+                        cancelFileRow(file, "已取消");
+                        job.setDoneFiles(nvl(job.getDoneFiles()) + 1);
+                        jobMapper.update(job);
+                    }
+                    continue;
+                }
                 if (!"queued".equals(file.getStatus())) {
                     continue;
                 }
                 processFile(job, file, binder, categories);
+                job = jobMapper.selectById(jobId, familyId);
+                if (job == null) {
+                    return;
+                }
+                ImportFileRow latestFile = fileMapper.selectById(file.getId());
+                if (latestFile != null && "cancelled".equals(latestFile.getStatus())) {
+                    continue;
+                }
                 job.setDoneFiles(nvl(job.getDoneFiles()) + 1);
                 jobMapper.update(job);
             }
-            finishParse(job);
+            job = jobMapper.selectById(jobId, familyId);
+            if (job == null) {
+                return;
+            }
+            if (jobStopped(jobId) || "cancelled".equals(job.getStatus())) {
+                finalizeCancel(job);
+            } else {
+                finishParse(job);
+            }
         } catch (Exception e) {
-            log.warn("导入任务 {} 失败：{}", jobId, e.getMessage());
-            job.setStatus("failed");
-            job.setMessage("任务失败：" + cut(e.getMessage(), 200));
-            job.setFinishTime(LocalDateTime.now());
-            jobMapper.update(job);
+            if (jobStopped(jobId) || Thread.currentThread().isInterrupted() || "已取消".equals(e.getMessage())) {
+                finalizeCancel(job);
+            } else {
+                log.warn("导入任务 {} 失败：{}", jobId, e.getMessage());
+                job.setStatus("failed");
+                job.setMessage("任务失败：" + cut(e.getMessage(), 200));
+                job.setFinishTime(LocalDateTime.now());
+                jobMapper.update(job);
+            }
+        } finally {
+            workers.remove(jobId);
+            cancelledJobs.remove(jobId);
         }
     }
 
     private void processFile(ImportJob job, ImportFileRow file, CategoryBinder binder, String categories) {
+        if (jobStopped(job.getId()) || fileStopped(file.getId())) {
+            cancelFileRow(file, "已取消");
+            return;
+        }
         file.setStatus("parsing");
         file.setProgress(8);
         fileMapper.update(file);
@@ -304,8 +450,16 @@ public class ImportService {
                 parseAttachment(job, file, bytes, binder, categories);
             }
         } catch (BizException e) {
-            failFile(job, file, e.getMessage());
+            if ("已取消".equals(e.getMessage()) || jobStopped(job.getId()) || fileStopped(file.getId())) {
+                cancelFileRow(file, "已取消");
+            } else {
+                failFile(job, file, e.getMessage());
+            }
         } catch (Exception e) {
+            if (jobStopped(job.getId()) || fileStopped(file.getId()) || Thread.currentThread().isInterrupted()) {
+                cancelFileRow(file, "已取消");
+                return;
+            }
             log.warn("解析文件 {} 失败：{}", file.getOriginalName(), e.getMessage());
             failFile(job, file, cut(e.getMessage(), 200));
         }
@@ -314,63 +468,29 @@ public class ImportService {
     private void parseExcel(ImportJob job, ImportFileRow file, byte[] bytes,
                             CategoryBinder binder, String categories) {
         String table;
-        List<String> chunks;
         try {
             table = ExcelTextExtractor.tableText(bytes, file.getOriginalName());
-            chunks = ExcelTextExtractor.chunks(bytes, file.getOriginalName());
         } catch (IllegalArgumentException e) {
             failFile(job, file, e.getMessage());
             return;
         }
-        if ((table == null || table.isBlank()) && chunks.isEmpty()) {
+        if (table == null || table.isBlank()) {
             rejectFile(job, file, "表格是空的，不像账单");
             return;
         }
         DifyParseResult local = BillTextParser.parse(table);
         if (local.isRelevant() && local.getRecords() != null && !local.getRecords().isEmpty()) {
+            if (alreadyCancelled(file.getId()) || fileStopped(file.getId())) {
+                cancelFileRow(file, "已取消");
+                return;
+            }
             saveRecords(job, file, local, binder);
             file.setStatus("ready");
             file.setProgress(100);
             fileMapper.update(file);
             return;
         }
-        if (chunks.isEmpty()) {
-            rejectFile(job, file, local.getReason() == null ? "表格是空的，不像账单" : local.getReason());
-            return;
-        }
-        boolean anyRelevant = false;
-        String lastReason = local.getReason();
-        for (int i = 0; i < chunks.size(); i++) {
-            try {
-                DifyParseResult parsed = parseChunk(file, chunks.get(i), categories);
-                if (parsed.isRelevant()) {
-                    anyRelevant = true;
-                    saveRecords(job, file, parsed, binder);
-                } else {
-                    lastReason = parsed.getReason();
-                }
-            } catch (BizException e) {
-                lastReason = e.getMessage();
-                log.warn("表格分块 {}/{} 调用智能体失败：{}", i + 1, chunks.size(), e.getMessage());
-            }
-            file.setProgress((i + 1) * 100 / chunks.size());
-            fileMapper.update(file);
-        }
-        if (!anyRelevant) {
-            rejectFile(job, file, lastReason == null ? "智能体认为这不是账单" : lastReason);
-            return;
-        }
-        file.setStatus("ready");
-        file.setProgress(100);
-        fileMapper.update(file);
-    }
-
-    private DifyParseResult parseChunk(ImportFileRow file, String chunk, String categories) {
-        if (difyClient.configured()) {
-            return difyClient.parse(null, file.getOriginalName(), file.getContentType(),
-                    "excel", chunk, categories);
-        }
-        return BillTextParser.parse(chunk);
+        sendOriginalToAgent(job, file, bytes, binder, categories);
     }
 
     private void parseAttachment(ImportJob job, ImportFileRow file, byte[] bytes,
@@ -379,14 +499,14 @@ public class ImportService {
             parsePdf(job, file, bytes, binder, categories);
             return;
         }
-        if (!difyClient.configured()) {
-            failFile(job, file, "请先配置 Dify API Key，图片需要智能体识别");
+        if (!billAgent.configured()) {
+            failFile(job, file, "请先配置 Dify API Key，图片由 Dify 文档提取/市场工具读取");
             return;
         }
         file.setProgress(20);
         fileMapper.update(file);
-        DifyParseResult parsed = difyClient.parse(bytes, file.getOriginalName(), file.getContentType(),
-                file.getKind(), null, categories);
+        DifyParseResult parsed = billAgent.parseFile(bytes, file.getOriginalName(), file.getContentType(),
+                file.getKind(), categories);
         acceptParsed(job, file, parsed, binder);
     }
 
@@ -404,16 +524,24 @@ public class ImportService {
         DifyParseResult parsed;
         if (prepared.hasText() && WeChatPdfParser.looksLike(prepared.text())) {
             parsed = WeChatPdfParser.parse(prepared.text());
+        } else if (prepared.hasText() && AlipayPdfParser.looksLike(prepared.text())) {
+            parsed = AlipayPdfParser.parse(PdfSupport.extractText(bytes, true));
         } else if (prepared.hasText()) {
             DifyParseResult local = BillTextParser.parse(prepared.text());
-            parsed = local.isRelevant() ? local : parseChunk(file, prepared.text(), categories);
-        } else if (prepared.hasImage()) {
-            if (!difyClient.configured()) {
-                failFile(job, file, "请先配置 Dify API Key，扫描件 PDF 需要智能体识别");
+            if (local.isRelevant()) {
+                parsed = local;
+            } else {
+                sendOriginalToAgent(job, file, bytes, binder, categories);
                 return;
             }
-            parsed = difyClient.parse(prepared.imagePng(), file.getOriginalName() + ".png",
-                    "image/png", "image", null, categories);
+        } else if (prepared.hasImage()) {
+            if (!billAgent.configured()) {
+                failFile(job, file, "请先配置 Dify API Key，扫描件由 Dify 文档提取/市场工具读取");
+                return;
+            }
+            parsed = billAgent.parseFile(bytes, file.getOriginalName(),
+                    file.getContentType() == null ? "application/pdf" : file.getContentType(),
+                    "pdf", categories);
         } else {
             failFile(job, file, "这份 PDF 没有可提取的文字，也无法渲染成图片");
             return;
@@ -421,7 +549,29 @@ public class ImportService {
         acceptParsed(job, file, parsed, binder);
     }
 
+    /** 本机抽不出时把用户上传的原文件交给 Dify 智能体，由读文件 / OCR 工具读内容。 */
+    private void sendOriginalToAgent(ImportJob job, ImportFileRow file, byte[] bytes,
+                                     CategoryBinder binder, String categories) {
+        if (!billAgent.configured()) {
+            failFile(job, file, "本机认不出这份文件，请先配置 Dify API Key，由智能体读原文件");
+            return;
+        }
+        file.setProgress(20);
+        fileMapper.update(file);
+        String mime = file.getContentType();
+        if (mime == null || mime.isBlank()) {
+            mime = "pdf".equals(file.getKind()) ? "application/pdf" : "application/octet-stream";
+        }
+        DifyParseResult parsed = billAgent.parseFile(bytes, file.getOriginalName(), mime,
+                file.getKind(), categories);
+        acceptParsed(job, file, parsed, binder);
+    }
+
     private void acceptParsed(ImportJob job, ImportFileRow file, DifyParseResult parsed, CategoryBinder binder) {
+        if (jobStopped(job.getId()) || fileStopped(file.getId()) || alreadyCancelled(file.getId())) {
+            cancelFileRow(file, "已取消，智能体结果未写入待确认");
+            return;
+        }
         if (!parsed.isRelevant()) {
             rejectFile(job, file, parsed.getReason() == null ? "智能体认为这不是账单" : parsed.getReason());
             return;
@@ -433,12 +583,16 @@ public class ImportService {
     }
 
     private void saveRecords(ImportJob job, ImportFileRow file, DifyParseResult parsed, CategoryBinder binder) {
+        if (jobStopped(job.getId()) || fileStopped(file.getId())) {
+            return;
+        }
         for (Map<String, Object> raw : parsed.getRecords()) {
             ImportItem item = fromAgent(job, file, raw, binder);
             itemMapper.insert(item);
             file.setExtracted(nvl(file.getExtracted()) + 1);
             job.setExtracted(nvl(job.getExtracted()) + 1);
         }
+        jobMapper.update(job);
     }
 
     private ImportItem fromAgent(ImportJob job, ImportFileRow file, Map<String, Object> raw, CategoryBinder binder) {
@@ -454,8 +608,13 @@ public class ImportService {
         String categoryName = str(raw.get("categoryName"));
         String merchant = trimTo(str(raw.get("merchant")), 100);
         String remark = trimTo(str(raw.get("remark")), 255);
-        if (categoryName == null || categoryName.isBlank()) {
-            categoryName = BillCategoryHints.guess(type, merchant, remark);
+        if (categoryName == null || categoryName.isBlank() || BillCategoryHints.isBroadExportCategory(categoryName)) {
+            String hinted = BillCategoryHints.guess(type, merchant, remark);
+            if (hinted != null && !hinted.isBlank()) {
+                categoryName = hinted;
+            } else if (BillCategoryHints.isBroadExportCategory(categoryName)) {
+                categoryName = BillCategoryHints.fromExportCategory(categoryName);
+            }
         }
         item.setCategoryName(categoryName);
         item.setMerchant(merchant);
@@ -506,6 +665,7 @@ public class ImportService {
         file.setRejectReason(cut(reason, 400));
         fileMapper.update(file);
         job.setRejected(nvl(job.getRejected()) + 1);
+        jobMapper.update(job);
     }
 
     private void failFile(ImportJob job, ImportFileRow file, String reason) {
@@ -515,10 +675,38 @@ public class ImportService {
         fileMapper.update(file);
     }
 
-    private void finishParse(ImportJob job) {
-        if (nvl(job.getExtracted()) > 0) {
+    private void repairPreview(ImportJob job) {
+        List<ImportFileRow> files = job.getFiles() == null
+                ? fileMapper.selectByJob(job.getId()) : job.getFiles();
+        int fileExt = files.stream().mapToInt(f -> nvl(f.getExtracted())).sum();
+        boolean hasPending = job.getItems() != null && job.getItems().stream()
+                .anyMatch(i -> "pending".equals(i.getStatus()));
+        boolean dirty = false;
+        if (fileExt > nvl(job.getExtracted())) {
+            job.setExtracted(fileExt);
+            dirty = true;
+        }
+        if ("done".equals(job.getStatus()) && nvl(job.getImported()) == 0 && (hasPending || fileExt > 0)) {
             job.setStatus("preview");
-            job.setMessage("抽出 " + job.getExtracted() + " 笔，请勾选后确认入库");
+            job.setFinishTime(null);
+            job.setMessage("抽出 " + nvl(job.getExtracted()) + " 笔，请勾选后确认入库");
+            dirty = true;
+        }
+        if (dirty) {
+            jobMapper.update(job);
+        }
+    }
+
+    private void finishParse(ImportJob job) {
+        int extracted = nvl(job.getExtracted());
+        if (extracted == 0) {
+            extracted = fileMapper.selectByJob(job.getId()).stream()
+                    .mapToInt(f -> nvl(f.getExtracted())).sum();
+            job.setExtracted(extracted);
+        }
+        if (extracted > 0) {
+            job.setStatus("preview");
+            job.setMessage("抽出 " + extracted + " 笔，请勾选后确认入库");
         } else {
             job.setStatus("done");
             job.setFinishTime(LocalDateTime.now());
@@ -575,6 +763,58 @@ public class ImportService {
         row.setStoredPath(dest.toAbsolutePath().toString());
         row.setStatus("queued");
         return row;
+    }
+
+    private void finalizeCancel(ImportJob job) {
+        skipRemaining(job.getId());
+        ImportJob latest = jobMapper.selectById(job.getId(), job.getFamilyId());
+        if (latest == null) {
+            return;
+        }
+        latest.setStatus("cancelled");
+        if (latest.getMessage() == null || !latest.getMessage().contains("已取消")) {
+            latest.setMessage("已取消。已经抽出的流水还在，未处理完的文件已停止。");
+        }
+        latest.setFinishTime(LocalDateTime.now());
+        jobMapper.update(latest);
+    }
+
+    private void skipRemaining(Long jobId) {
+        for (ImportFileRow file : fileMapper.selectByJob(jobId)) {
+            if ("queued".equals(file.getStatus()) || "parsing".equals(file.getStatus())) {
+                cancelFileRow(file, "已取消");
+            }
+        }
+    }
+
+    private void cancelFileRow(ImportFileRow file, String reason) {
+        file.setStatus("cancelled");
+        file.setProgress(100);
+        file.setRejectReason(cut(reason, 400));
+        fileMapper.update(file);
+    }
+
+    private boolean jobStopped(Long jobId) {
+        return jobId != null && cancelledJobs.contains(jobId);
+    }
+
+    private boolean fileStopped(Long fileId) {
+        return fileId != null && cancelledFiles.contains(fileId);
+    }
+
+    private boolean alreadyCancelled(Long fileId) {
+        if (fileId == null) {
+            return false;
+        }
+        ImportFileRow latest = fileMapper.selectById(fileId);
+        return latest != null && "cancelled".equals(latest.getStatus());
+    }
+
+    private void interruptWorker(Long jobId) {
+        Thread t = workers.get(jobId);
+        if (t != null && t != Thread.currentThread()) {
+            t.interrupt();
+        }
     }
 
     private void assertCanView(ImportJob job) {

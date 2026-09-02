@@ -56,6 +56,30 @@ public final class CategoryBinder {
         return "收入：" + income + "\n支出：" + expense;
     }
 
+    /** 只给末级名，少占模型上下文。 */
+    public String listCompact() {
+        StringBuilder income = new StringBuilder();
+        StringBuilder expense = new StringBuilder();
+        for (Category c : leaves) {
+            String name = c.getCategoryName();
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            if (c.getType() != null && c.getType() == 1) {
+                if (income.length() > 0) {
+                    income.append('、');
+                }
+                income.append(name);
+            } else {
+                if (expense.length() > 0) {
+                    expense.append('、');
+                }
+                expense.append(name);
+            }
+        }
+        return "收入：" + income + "\n支出：" + expense;
+    }
+
     public Category match(Integer type, String name) {
         int t = type == null || type != 1 ? 2 : 1;
         if (name != null && !name.isBlank()) {

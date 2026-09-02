@@ -36,9 +36,24 @@ public class ImportController {
         return Result.ok(importService.create(files, memberId));
     }
 
+    @GetMapping("/jobs")
+    public Result<java.util.List<ImportJob>> list() {
+        return Result.ok(importService.list());
+    }
+
     @GetMapping("/jobs/{id}")
     public Result<ImportJob> detail(@PathVariable Long id) {
         return Result.ok(importService.detail(id));
+    }
+
+    @PostMapping("/jobs/{id}/cancel")
+    public Result<ImportJob> cancel(@PathVariable Long id) {
+        return Result.ok(importService.cancel(id));
+    }
+
+    @PostMapping("/jobs/{id}/files/{fileId}/cancel")
+    public Result<ImportJob> cancelFile(@PathVariable Long id, @PathVariable Long fileId) {
+        return Result.ok(importService.cancelFile(id, fileId));
     }
 
     @PostMapping("/jobs/{id}/confirm")

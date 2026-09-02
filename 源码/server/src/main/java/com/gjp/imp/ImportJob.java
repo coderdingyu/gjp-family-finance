@@ -21,6 +21,8 @@ public class ImportJob {
     private LocalDateTime finishTime;
 
     private String memberName;
+    /** 当前上传人从第一次导入起的序号，不是数据库主键 */
+    private Integer seqNo;
     private Integer duplicateCount;
     private List<ImportFileRow> files = new ArrayList<>();
     private List<ImportItem> items = new ArrayList<>();
@@ -135,6 +137,14 @@ public class ImportJob {
 
     public void setMemberName(String memberName) {
         this.memberName = memberName;
+    }
+
+    public Integer getSeqNo() {
+        return seqNo;
+    }
+
+    public void setSeqNo(Integer seqNo) {
+        this.seqNo = seqNo;
     }
 
     public List<ImportFileRow> getFiles() {

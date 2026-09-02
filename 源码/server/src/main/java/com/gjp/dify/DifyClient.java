@@ -92,15 +92,18 @@ public class DifyClient {
             throw new BizException("尚未配置 Dify API Key，请在环境变量 DIFY_API_KEY 中填写");
         }
         try {
+            long t0 = System.nanoTime();
             String uploadId = null;
             String fileType = "document";
-            if (fileBytes != null && fileBytes.length > 0 && !"excel".equals(fileKind)) {
+            if (fileBytes != null && fileBytes.length > 0) {
                 fileType = "image".equals(fileKind) ? "image" : "document";
                 uploadId = uploadFile(fileBytes, filename, mime);
             }
             String raw = props.workflowMode()
                     ? runWorkflow(uploadId, fileType, textContent, categories)
                     : runChat(uploadId, fileType, textContent, categories);
+            log.info("Dify {} 耗时 {}ms", fileKind == null ? "text" : fileKind,
+                    Math.round((System.nanoTime() - t0) / 1_000_000.0));
             return parseAnswer(raw);
         } catch (BizException e) {
             throw e;
@@ -123,7 +126,13 @@ public class DifyClient {
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body))
                 .build();
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> resp;
+        try {
+            resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BizException("已取消");
+        }
         if (resp.statusCode() >= 300) {
             throw new BizException("Dify 上传文件失败（" + resp.statusCode() + "）：" + cut(resp.body()));
         }
@@ -189,6 +198,10 @@ public class DifyClient {
         }
         String answer = firstText(data, "data.outputs.result", "data.outputs.text", "answer");
         if (answer == null || answer.isBlank()) {
+            String wfError = firstText(data, "data.error", "error");
+            if (wfError != null && !wfError.isBlank()) {
+                throw new BizException("智能体失败：" + cut(wfError));
+            }
             throw new BizException("工作流没有返回可解析的输出");
         }
         return answer;
@@ -202,7 +215,13 @@ public class DifyClient {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8))
                 .build();
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> resp;
+        try {
+            resp = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BizException("已取消");
+        }
         if (resp.statusCode() >= 300) {
             throw new BizException("Dify 调用失败（" + resp.statusCode() + "）：" + cut(resp.body()));
         }

@@ -24,7 +24,14 @@ public interface ImportFileMapper {
     @Select("SELECT * FROM t_import_file WHERE id = #{id}")
     ImportFileRow selectById(@Param("id") Long id);
 
+    @Select("SELECT * FROM t_import_file WHERE status = 'parsing'")
+    List<ImportFileRow> selectParsing();
+
     @Update("UPDATE t_import_file SET status=#{status}, progress=#{progress}, reject_reason=#{rejectReason}, "
             + "extracted=#{extracted} WHERE id=#{id}")
     int update(ImportFileRow row);
+
+    @Update("UPDATE t_import_file SET status='queued', progress=0, reject_reason=NULL "
+            + "WHERE status='parsing'")
+    int resetParsingToQueued();
 }

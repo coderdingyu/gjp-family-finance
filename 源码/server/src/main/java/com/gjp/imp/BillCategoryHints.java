@@ -36,14 +36,14 @@ public final class BillCategoryHints {
         if (contains(blob, "咖啡", "奶茶", "喜茶", "瑞幸", "茶百道")) {
             return "咖啡奶茶";
         }
-        if (contains(blob, "外卖", "美团", "饿了么")) {
+        if (contains(blob, "外卖", "美团外卖", "饿了么")) {
             return "外卖";
         }
         if (contains(blob, "食堂", "餐厅", "餐饮", "小吃", "就餐", "堂食", "套餐", "校联")) {
             return "正餐";
         }
-        if (contains(blob, "京东", "拼多多", "淘宝", "天猫")) {
-            return "日用品";
+        if (contains(blob, "加速器", "游戏", "充值", "steam", "razer")) {
+            return "游戏充值";
         }
         if (contains(blob, "蜜雪")) {
             return "咖啡奶茶";
@@ -54,11 +54,17 @@ public final class BillCategoryHints {
         if (contains(blob, "水果", "零食")) {
             return "零食水果";
         }
-        if (contains(blob, "滴滴", "打车", "出行")) {
+        if (contains(blob, "哈啰", "单车", "骑行", "地铁", "公交", "一卡通", "12306", "中铁", "铁路")) {
+            return "公共交通";
+        }
+        if (contains(blob, "滴滴", "打车")) {
             return "打车";
         }
-        if (contains(blob, "12306", "中铁", "铁路", "地铁", "公交", "一卡通")) {
-            return "公共交通";
+        if (contains(blob, "售货柜", "自动贩", "可乐", "怡泉", "魔爪")) {
+            return "零食水果";
+        }
+        if (contains(blob, "抖音", "淘宝", "天猫", "拼多多", "京东")) {
+            return "日用品";
         }
         if (contains(blob, "加油")) {
             return "加油";
@@ -72,7 +78,7 @@ public final class BillCategoryHints {
         if (contains(blob, "电影", "影城")) {
             return "电影";
         }
-        if (contains(blob, "游戏", "充值")) {
+        if (contains(blob, "游戏", "充值", "加速器", "steam", "razer")) {
             return "游戏充值";
         }
         if (contains(blob, "会员", "云空间", "流媒体")) {
@@ -88,6 +94,41 @@ public final class BillCategoryHints {
             return "送礼";
         }
         return "";
+    }
+
+    /** 支付宝「交易分类」太粗，不能直接当本系统末级分类。 */
+    public static boolean isBroadExportCategory(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        String c = compact(name);
+        return c.contains("交通出行") || c.contains("餐饮美食") || c.contains("日用百货")
+                || c.contains("文化休闲") || c.contains("数码电器") || c.contains("商业服务")
+                || c.contains("信用借还") || c.contains("医疗健康") || c.equals("其他")
+                || c.equals("退款");
+    }
+
+    public static String fromExportCategory(String name) {
+        if (name == null || name.isBlank()) {
+            return "";
+        }
+        String c = compact(name);
+        if (c.contains("餐饮") || c.contains("美食")) {
+            return "正餐";
+        }
+        if (c.contains("交通") || c.contains("出行")) {
+            return "公共交通";
+        }
+        if (c.contains("日用") || c.contains("百货")) {
+            return "日用品";
+        }
+        if (c.contains("数码") || c.contains("电器")) {
+            return "手机数码";
+        }
+        if (c.contains("医疗")) {
+            return "药品";
+        }
+        return "杂项";
     }
 
     private static boolean contains(String blob, String... words) {

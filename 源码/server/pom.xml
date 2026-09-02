@@ -45,14 +45,14 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- 把 Excel/CSV 先拆成文本再交给 Dify，避免一张上百行的表一次撑爆模型上下文 -->
+        <!-- 把 Excel/CSV 先拆成文本；规整表本机抽，怪表再分块给通义/Dify -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
         </dependency>
 
-        <!-- 文本型 PDF 先抽文字；扫面件再渲染成图交给视觉模型 -->
+        <!-- 文本型 PDF 先抽文字；扫描件整文件交给 Dify 读文件工具 -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>

@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MaxUploadSizeExceededException.class, MultipartException.class})
     public Result<Void> handleUpload(Exception e) {
         log.warn("上传失败：{}", e.getMessage());
-        return Result.fail("文件太大：单个不超过 12MB，一次不超过 80MB");
+        return Result.fail("文件太大：单个不超过 12MB，一次不超过 120MB（最多 10 个）");
     }
 
     /** /api/record/abc 这类路径变量类型对不上，不应落到 500 */

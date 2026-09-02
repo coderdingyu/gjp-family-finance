@@ -1,0 +1,165 @@
+app:
+  description: 用 Dify 内置文档提取器把账单文件读成文字。给「管家婆账单导入」智能体当读文件工具，不解析、不写库。
+  icon: 📄
+  icon_background: '#E8F5E9'
+  icon_type: emoji
+  mode: workflow
+  name: 管家婆读文件
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      - .PDF
+      - .XLS
+      - .XLSX
+      - .CSV
+      - .DOC
+      - .DOCX
+      allowed_file_types:
+      - image
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 1
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: document-extractor
+      id: start-to-extract
+      source: '1788348000001'
+      sourceHandle: source
+      target: '1788348000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: document-extractor
+        targetType: end
+      id: extract-to-end
+      source: '1788348000002'
+      sourceHandle: source
+      target: '1788348000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 读文件入口
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - image
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          label: 账单文件
+          max_length: 48
+          required: true
+          type: file
+          variable: bill_file
+      height: 90
+      id: '1788348000001'
+      position:
+        x: 80
+        y: 200
+      positionAbsolute:
+        x: 80
+        y: 200
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: Dify 内置文档提取器，把 PDF/Excel/Word/图片等读成文字
+        is_array_file: false
+        selected: false
+        title: 文档提取
+        type: document-extractor
+        variable_selector:
+        - '1788348000001'
+        - bill_file
+      height: 90
+      id: '1788348000002'
+      position:
+        x: 400
+        y: 200
+      positionAbsolute:
+        x: 400
+        y: 200
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 抽出的文字
+        outputs:
+        - value_selector:
+          - '1788348000002'
+          - text
+          variable: text
+        selected: false
+        title: 结束
+        type: end
+      height: 90
+      id: '1788348000003'
+      position:
+        x: 720
+        y: 200
+      positionAbsolute:
+        x: 720
+        y: 200
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []

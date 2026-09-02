@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ImportProperties {
 
     private String uploadDir = "./uploads/import";
-    private int maxFiles = 8;
+    private int maxFiles = 10;
 
     public String getUploadDir() {
         return uploadDir;
