@@ -36,6 +36,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                // 身份靠 X-Auth-Token 头传递，跨源调试时必须放行它，否则请求发不出去
+                .allowedHeaders("*")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

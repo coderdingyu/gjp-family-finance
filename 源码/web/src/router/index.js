@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { currentUser, ROLE } from '../utils/auth'
-import { homeOf, verifyCurrentUser } from '../utils/authSession'
+import { homeOf, resetTabIdentity, verifyCurrentUser } from '../utils/authSession'
 
 /**
  * 路由表。
@@ -104,18 +104,25 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   document.title = to.meta.title ? `${to.meta.title} - 管家婆` : '管家婆'
 
-  // 首次加载、刷新和直接打开新标签页时，都先向服务端确认真实身份。
+  // 「新标签页登录其他账号」打开的页面。浏览器在某些情况下会把来源标签页的
+  // sessionStorage 复制过来（手动复制标签页也会），这里把带过来的身份丢掉，
+  // 否则新标签页打开就直接是同一个账号，登不了第二个号。
+  //
+  // 注意只清本地，绝不能调后端退出接口：这个 token 属于来源标签页，
+  // 退掉会把还在正常使用的那个标签页一起踢下线。
+  if (to.path === '/login' && to.query.fresh !== undefined) {
+    resetTabIdentity()
+    // 去掉 query，避免刷新时反复触发清理
+    return { path: '/login', replace: true }
+  }
+
+  // 首次加载、刷新和直接打开新标签页时，都先向服务端确认本标签页的真实身份。
   // 网络暂时不可用时保留本地展示缓存；任何后续业务请求仍会由服务端权限兜底。
   try {
-    const { user, changed } = await verifyCurrentUser({ broadcastExpiry: true })
-    if (changed && user && from.matched.length) {
-      // 已挂载页面发现身份变化时，必须销毁旧账号的组件状态和未完成请求。
-      window.location.replace(homeOf(user.role))
-      return false
-    }
+    await verifyCurrentUser()
   } catch (e) {
     // 非 401（例如服务未启动）由请求层提示，此处不把网络故障误判为退出登录。
   }

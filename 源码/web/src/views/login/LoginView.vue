@@ -61,7 +61,7 @@ import { ElMessage } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
 import { login, register } from '../../api/auth'
 import { ROLE, setUser } from '../../utils/auth'
-import { AUTH_EVENT, publishAuthEvent } from '../../utils/authSync'
+import { setToken } from '../../utils/authToken'
 
 const tab = ref('login')
 const loading = ref(false)
@@ -88,11 +88,14 @@ const regRules = {
   ]
 }
 
-function enter(user) {
+function enter(result) {
+  // token 先存下来，它决定本标签页之后以哪个身份发请求；顺序反了会先发出一次无身份的请求。
+  const user = result.user
+  setToken(result.token)
   setUser(user)
-  publishAuthEvent(AUTH_EVENT.LOGIN)
   ElMessage.success(`欢迎回来，${user.realName || user.username}`)
-  // 整页进入新账号首页，确保旧账号的组件状态、请求和轮询全部销毁。
+  // 整页进入首页，确保这个标签页上一个账号的组件状态、请求和轮询全部销毁。
+  // 只影响本标签页：别的标签页的身份存在各自的 sessionStorage 里，不受这里影响。
   window.location.replace(user.role === ROLE.ADMIN ? '/admin' : '/home')
 }
 

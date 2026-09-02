@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { clearUser } from './auth'
-import { AUTH_EVENT, publishAuthEvent } from './authSync'
+import { clearToken, getToken } from './authToken'
 
 /**
  * axios 统一实例。
@@ -12,8 +12,17 @@ import { AUTH_EVENT, publishAuthEvent } from './authSync'
 const request = axios.create({
   baseURL: '/api',
   timeout: 15000,
-  // session 登录态靠 Cookie，必须带上凭证
+  // 身份表挂在服务端 session 上，Cookie 仍要带；具体用表里哪个身份由下面的 token 头指定
   withCredentials: true
+})
+
+request.interceptors.request.use((config) => {
+  // 每个标签页带自己的 token，服务端据此区分同一浏览器里的多个登录账号
+  const token = getToken()
+  if (token) {
+    config.headers['X-Auth-Token'] = token
+  }
+  return config
 })
 
 let authRedirecting = false
@@ -25,10 +34,11 @@ function unauthorized(message, config = {}) {
   // /auth/current 的主动校准由调用方决定是否跳转，避免首次打开登录页也提示“已过期”。
   if (config.skipAuthRedirect) return Promise.reject(error)
 
+  // 只清本标签页的身份。别的标签页登着别的账号，与这次掉线无关，不要去动它们。
+  clearToken()
   clearUser()
   if (!authRedirecting) {
     authRedirecting = true
-    publishAuthEvent(AUTH_EVENT.EXPIRED)
     ElMessage.warning('登录已过期，请重新登录')
     window.location.replace('/login')
   }

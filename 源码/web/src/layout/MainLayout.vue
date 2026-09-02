@@ -85,7 +85,7 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="switch">切换账号</el-dropdown-item>
+                <el-dropdown-item command="newLogin">新标签页登录其他账号</el-dropdown-item>
                 <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -109,8 +109,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { logout as doLogout } from '../api/auth'
 import QuickAddBall from '../components/QuickAddBall.vue'
-import { clearUser, currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, ROLE } from '../utils/auth'
-import { AUTH_EVENT, publishAuthEvent } from '../utils/authSync'
+import { currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, ROLE } from '../utils/auth'
+import { resetTabIdentity } from '../utils/authSession'
 
 const route = useRoute()
 
@@ -123,19 +123,35 @@ const roleTagType = computed(() => {
   return 'info'
 })
 
-async function onCommand(cmd) {
-  if (cmd !== 'logout' && cmd !== 'switch') return
-  const switching = cmd === 'switch'
+function onCommand(cmd) {
+  if (cmd === 'newLogin') return openAnotherLogin()
+  if (cmd === 'logout') return logoutThisTab()
+}
+
+/**
+ * 在新标签页登录另一个账号，本标签页原样保持登录。
+ *
+ * 两个细节都不能改：
+ * · 不能加确认框。await 之后浏览器认为已经脱离用户手势，window.open 会被当弹窗拦掉。
+ * · 必须带 noopener。否则新标签页会复制本页的 sessionStorage，把身份 token 一起带过去，
+ *   打开后仍是同一个账号。fresh=1 是第二道保险，见路由守卫。
+ */
+function openAnotherLogin() {
+  window.open('/login?fresh=1', '_blank', 'noopener')
+  ElMessage.success('已在新标签页打开登录页，当前账号保持登录')
+}
+
+async function logoutThisTab() {
   await ElMessageBox.confirm(
-    switching ? '切换账号将退出当前账号并回到登录页，是否继续？' : '确认退出登录？',
-    switching ? '切换账号' : '提示',
+    '确认退出登录？只退出当前标签页，其他标签页登录的账号不受影响。',
+    '提示',
     { type: 'warning' }
   )
+  // 后端按本标签页的 token 只退掉这一个身份槽位
   await doLogout()
-  clearUser()
-  publishAuthEvent(switching ? AUTH_EVENT.SWITCH : AUTH_EVENT.LOGOUT)
-  ElMessage.success(switching ? '已安全退出，请登录新账号' : '已退出登录')
-  window.location.replace(switching ? '/login?switch=1' : '/login')
+  resetTabIdentity()
+  ElMessage.success('已退出登录')
+  window.location.replace('/login')
 }
 </script>
 
