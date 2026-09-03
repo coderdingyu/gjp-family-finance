@@ -200,6 +200,10 @@ public class MemberService {
             throw new BizException("密码长度需在 6-20 个字符之间");
         }
         userMapper.updatePassword(userId, Md5Util.md5(newPassword));
+        if (UserContext.isSelf(userId)) {
+            // 改的是自己：把新版本号同步回当前会话，别把操作人自己踢下线
+            UserContext.syncSessionVersion(userMapper.selectById(userId).getSessionVersion());
+        }
         logService.record(OperationLogService.M_MEMBER, OperationLogService.A_RESET_PWD, userId,
                 "重置账号 " + target.getUsername() + " 的密码");
     }

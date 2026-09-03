@@ -1,5 +1,6 @@
 package com.gjp.imp;
 
+import com.gjp.common.AppTime;
 import com.gjp.dify.DifyParseResult;
 
 import java.math.BigDecimal;
@@ -96,7 +97,7 @@ public final class AlipayPdfParser {
             return null;
         }
         LocalDate date = BillTextParser.parseDate(dateM.group(1));
-        if (date == null || date.isAfter(LocalDate.now())) {
+        if (date == null || date.isAfter(AppTime.today())) {
             return null;
         }
         Matcher amtM = AMOUNT_BEFORE_ORDER.matcher(joined);

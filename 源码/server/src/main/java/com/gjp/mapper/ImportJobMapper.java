@@ -38,6 +38,16 @@ public interface ImportJobMapper {
             + "WHERE j.status IN ('queued', 'running') ORDER BY j.id")
     java.util.List<ImportJob> selectUnfinished();
 
+    /**
+     * 卡在入库中的任务。确认入库不是后台任务，进程在这一步被杀就没人再改它的状态，
+     * 而 importing 状态下 confirm 和 cancel 都会被拒绝，这批待确认流水会永远入不了库。
+     * 启动时单独捞出来复位，不能并进 selectUnfinished —— 那条路会重新丢给线程池解析。
+     */
+    @Select("SELECT j.*, m.member_name AS member_name FROM t_import_job j "
+            + "LEFT JOIN t_member m ON j.member_id = m.id "
+            + "WHERE j.status = 'importing' ORDER BY j.id")
+    java.util.List<ImportJob> selectStuckImporting();
+
     @Update("UPDATE t_import_job SET status=#{status}, done_files=#{doneFiles}, extracted=#{extracted}, "
             + "imported=#{imported}, rejected=#{rejected}, message=#{message}, "
             + "finish_time=#{finishTime} WHERE id=#{id}")
