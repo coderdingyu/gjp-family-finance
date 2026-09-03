@@ -125,6 +125,23 @@ public class UserContext {
         return u.getMemberId();
     }
 
+    /** 被操作的账号是不是当前登录人自己 */
+    public static boolean isSelf(Long userId) {
+        LoginUser u = HOLDER.get();
+        return u != null && userId != null && userId.equals(u.getUserId());
+    }
+
+    /**
+     * 把当前会话的 sessionVersion 同步成库里的最新值。
+     * 改自己的密码之后必须调一次，否则下一个请求会被拦截器当成「密码已被别处重置」踢下线。
+     */
+    public static void syncSessionVersion(Integer version) {
+        LoginUser u = HOLDER.get();
+        if (u != null) {
+            u.setSessionVersion(version);
+        }
+    }
+
     /** 要求户主及以上权限，否则抛 403 */
     public static void requireOwner() {
         if (!isOwner()) {

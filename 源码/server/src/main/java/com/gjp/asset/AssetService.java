@@ -1,5 +1,6 @@
 package com.gjp.asset;
 
+import com.gjp.common.AppTime;
 import com.gjp.common.BizException;
 import com.gjp.common.UserContext;
 import com.gjp.entity.Asset;
@@ -100,7 +101,7 @@ public class AssetService {
         if (asset.getCost() != null && asset.getCost().compareTo(BigDecimal.ZERO) < 0) {
             throw new BizException("取得成本不能为负数");
         }
-        if (asset.getBuyDate() != null && asset.getBuyDate().isAfter(LocalDate.now())) {
+        if (asset.getBuyDate() != null && asset.getBuyDate().isAfter(AppTime.today())) {
             throw new BizException("取得日期不能晚于今天");
         }
     }
@@ -212,7 +213,7 @@ public class AssetService {
         if (loan.getPaidMonths() > loan.getTotalMonths()) {
             throw new BizException("已还期数不能超过总期数");
         }
-        if (loan.getStartDate() != null && loan.getStartDate().isAfter(LocalDate.now())) {
+        if (loan.getStartDate() != null && loan.getStartDate().isAfter(AppTime.today())) {
             throw new BizException("起始还款日不能晚于今天");
         }
     }

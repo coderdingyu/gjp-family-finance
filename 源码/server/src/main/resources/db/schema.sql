@@ -40,7 +40,7 @@ CREATE TABLE t_user (
     member_id    BIGINT                DEFAULT NULL   COMMENT '绑定的家庭成员ID，普通成员据此做数据隔离',
     role         TINYINT      NOT NULL DEFAULT 0      COMMENT '角色：0=普通成员 1=户主 2=系统管理员',
     status       TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1=正常 0=已禁用（禁用后不能登录）',
-    session_version INT       NOT NULL DEFAULT 0      COMMENT '登录会话版本；禁用时加一，已登录请求对不上即踢下线',
+    session_version INT       NOT NULL DEFAULT 0      COMMENT '登录会话版本；禁用或改密码时加一，已登录请求对不上即踢下线',
     last_login   DATETIME              DEFAULT NULL   COMMENT '最后登录时间',
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),

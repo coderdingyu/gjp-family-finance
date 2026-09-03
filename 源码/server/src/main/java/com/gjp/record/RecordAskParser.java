@@ -1,5 +1,6 @@
 package com.gjp.record;
 
+import com.gjp.common.AppTime;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gjp.dify.DifyClient;
@@ -227,7 +228,7 @@ public final class RecordAskParser {
 
     private static void parseDates(String text, RecordQuery query) {
         YearMonth now = YearMonth.now();
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppTime.today();
         if (text.contains("上个月") || text.contains("上月")) {
             YearMonth prev = now.minusMonths(1);
             query.setStartDate(prev.atDay(1));

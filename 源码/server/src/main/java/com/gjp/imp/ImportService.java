@@ -1,5 +1,6 @@
 package com.gjp.imp;
 
+import com.gjp.common.AppTime;
 import com.gjp.common.BizException;
 import com.gjp.common.UserContext;
 import com.gjp.dify.BillAgent;
@@ -97,6 +98,22 @@ public class ImportService {
                 file.setRejectReason(null);
                 fileMapper.update(file);
             }
+        }
+        // 上次进程是在「确认入库」中途挂掉的：没人会再推进它，先复位再说，
+        // 已经入库的条目状态是 accepted，不会被重复写入。
+        for (ImportJob job : jobMapper.selectStuckImporting()) {
+            boolean hasPending = itemMapper.selectByJob(job.getId()).stream()
+                    .anyMatch(i -> "pending".equals(i.getStatus()));
+            if (hasPending) {
+                job.setStatus("preview");
+                job.setFinishTime(null);
+                job.setMessage("服务重启前正在入库，请重新勾选确认");
+            } else {
+                job.setStatus("done");
+                job.setFinishTime(LocalDateTime.now());
+                job.setMessage("服务重启前已完成入库");
+            }
+            jobMapper.update(job);
         }
         for (ImportJob job : jobMapper.selectUnfinished()) {
             if ("running".equals(job.getStatus())) {
@@ -635,7 +652,7 @@ public class ImportService {
         } else if (item.getRecordDate() == null) {
             item.setStatus("skipped");
             item.setRejectReason("日期无效");
-        } else if (item.getRecordDate().isAfter(LocalDate.now())) {
+        } else if (item.getRecordDate().isAfter(AppTime.today())) {
             item.setStatus("skipped");
             item.setRejectReason("发生日期不能晚于今天");
         } else if (item.getCategoryId() == null) {

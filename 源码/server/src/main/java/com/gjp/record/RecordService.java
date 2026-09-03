@@ -1,5 +1,6 @@
 package com.gjp.record;
 
+import com.gjp.common.AppTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gjp.common.BizException;
 import com.gjp.common.LikeEscape;
@@ -136,7 +137,7 @@ public class RecordService {
                         Map.of(
                                 "question", question,
                                 "snapshot", snapshot,
-                                "today", LocalDate.now().toString()
+                                "today", AppTime.today().toString()
                         ));
                 draft = RecordAskParser.parseDify(raw);
                 agent = true;
@@ -251,7 +252,7 @@ public class RecordService {
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("today", LocalDate.now().toString());
+        payload.put("today", AppTime.today().toString());
         payload.put("scope", memberId == null ? "family" : "member");
         payload.put("total", total);
         payload.put("shown", recs.size());
@@ -465,7 +466,7 @@ public class RecordService {
         if (record.getRecordDate() == null) {
             throw new BizException("请选择发生日期");
         }
-        if (record.getRecordDate().isAfter(LocalDate.now())) {
+        if (record.getRecordDate().isAfter(AppTime.today())) {
             throw new BizException("发生日期不能晚于今天");
         }
         if (record.getRecordDate().isBefore(LocalDate.of(2000, 1, 1))) {

@@ -115,6 +115,10 @@ public class AdminService {
             throw new BizException("密码长度需在 6-20 个字符之间");
         }
         userMapper.updatePassword(userId, Md5Util.md5(newPassword));
+        if (UserContext.isSelf(userId)) {
+            // 改的是自己：把新版本号同步回当前会话，别把操作人自己踢下线
+            UserContext.syncSessionVersion(userMapper.selectById(userId).getSessionVersion());
+        }
         logService.record(OperationLogService.M_ADMIN, OperationLogService.A_RESET_PWD, userId,
                 "管理员重置账号 " + target.getUsername() + " 的密码");
     }
@@ -147,6 +151,10 @@ public class AdminService {
             throw new BizException("新密码长度需在 6-20 个字符之间");
         }
         userMapper.updatePassword(self.getId(), Md5Util.md5(newPassword));
+        if (UserContext.isSelf(self.getId())) {
+            // 改的是自己：把新版本号同步回当前会话，别把操作人自己踢下线
+            UserContext.syncSessionVersion(userMapper.selectById(self.getId()).getSessionVersion());
+        }
         logService.record(OperationLogService.M_ADMIN, OperationLogService.A_RESET_PWD, self.getId(),
                 "管理员修改自己的登录密码");
     }

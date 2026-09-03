@@ -1,5 +1,6 @@
 package com.gjp.stat;
 
+import com.gjp.common.AppTime;
 import com.gjp.common.BizException;
 
 import java.time.LocalDate;
@@ -33,7 +34,7 @@ public class DateRange {
             YearMonth ym = YearMonth.of(year, month);
             return new DateRange(ym.atDay(1), ym.atEndOfMonth());
         }
-        int y = year != null ? year : LocalDate.now().getYear();
+        int y = year != null ? year : AppTime.today().getYear();
         return new DateRange(LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31));
     }
 
@@ -56,7 +57,7 @@ public class DateRange {
      * 起始日本身就在未来（查了下一年）时保持原值，避免把区间收成空。
      */
     public LocalDate effectiveEnd() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = AppTime.today();
         if (end.isAfter(today) && !start.isAfter(today)) {
             return today;
         }
@@ -66,7 +67,7 @@ public class DateRange {
     /** 尚未过完的当前月：环比、异常月均值不应把它当成完整月 */
     public static boolean isIncompleteMonth(YearMonth ym) {
         YearMonth now = YearMonth.now();
-        return ym.equals(now) && LocalDate.now().isBefore(now.atEndOfMonth());
+        return ym.equals(now) && AppTime.today().isBefore(now.atEndOfMonth());
     }
 
     /** 区间跨越的月份数（未来空月不计入），用于算月均，至少为 1，避免除零 */

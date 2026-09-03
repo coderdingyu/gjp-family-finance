@@ -43,7 +43,17 @@ public class LoginInterceptor implements HandlerInterceptor {
             // 只踢这个账号的槽位，不能整个 session 作废：
             // 同一浏览器别的标签页可能正登着别的账号（例如管理员），不该被连带踢下线。
             AuthSlots.removeByUser(request, loginUser.getUserId());
-            writeUnauthorized(response, "账号已禁用");
+            // 三种情况要分开说：前端会把这句话直接弹给用户，
+            // 密码被重置后提示"账号已禁用"会让人以为被封号，跑去找户主要解封。
+            String reason;
+            if (db == null) {
+                reason = "账号已被删除";
+            } else if (db.getStatus() != null && db.getStatus() == 0) {
+                reason = "账号已禁用";
+            } else {
+                reason = "登录密码已变更，请重新登录";
+            }
+            writeUnauthorized(response, reason);
             return false;
         }
         UserContext.set(loginUser);

@@ -1,5 +1,6 @@
 package com.gjp.analysis;
 
+import com.gjp.common.AppTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gjp.common.UserContext;
 import com.gjp.dify.DifyProperties;
@@ -142,7 +143,7 @@ public class AnalysisService {
                                               List<MonthAmount> trend) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("range", range.toString());
-        snapshot.put("today", LocalDate.now().toString());
+        snapshot.put("today", AppTime.today().toString());
         snapshot.put("scope", memberId == null ? "family" : "member");
         Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("income", totalIncome);

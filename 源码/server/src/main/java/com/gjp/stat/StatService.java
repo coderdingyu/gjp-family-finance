@@ -1,5 +1,6 @@
 package com.gjp.stat;
 
+import com.gjp.common.AppTime;
 import com.gjp.common.UserContext;
 import com.gjp.entity.Member;
 import com.gjp.entity.Record;
@@ -19,7 +20,6 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -259,8 +259,7 @@ public class StatService {
      */
     public Map<String, Object> personal() {
         Long memberId = UserContext.requireOwnMemberId();
-        ZoneId zone = ZoneId.of("Asia/Shanghai");
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = AppTime.today();
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekEnd = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         YearMonth ym = YearMonth.from(today);

@@ -35,7 +35,13 @@ public interface UserMapper {
     int updateBinding(@Param("id") Long id, @Param("familyId") Long familyId,
                       @Param("memberId") Long memberId, @Param("realName") String realName);
 
-    @Update("UPDATE t_user SET password = #{password} WHERE id = #{id}")
+    /**
+     * 改密码时把 session_version 加一，让这个账号已经登录着的页面下一次请求就被踢下线。
+     * 重置密码的常见原因就是账号疑似被别人拿到，只换密码不断开旧会话等于没换。
+     * 改自己密码的入口会把新版本号同步回当前会话，不会把操作人自己踢掉。
+     */
+    @Update("UPDATE t_user SET password = #{password}, "
+            + "session_version = IFNULL(session_version, 0) + 1 WHERE id = #{id}")
     int updatePassword(@Param("id") Long id, @Param("password") String password);
 
     @Update("UPDATE t_user SET status = #{status}, "
