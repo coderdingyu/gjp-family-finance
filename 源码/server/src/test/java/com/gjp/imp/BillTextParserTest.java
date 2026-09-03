@@ -149,7 +149,7 @@ class BillTextParserTest {
         );
         List<String> slim = ExcelTextExtractor.slim(ExcelTextExtractor.dropPreamble(lines));
         assertTrue(slim.get(0).startsWith("交易时间"));
-        assertFalse(slim.get(0).contains("交易单号"));
+        assertTrue(slim.get(0).contains("交易单号"));
         assertEquals(2, slim.size());
         List<String> chunks = ExcelTextExtractor.chunkLines(slim);
         assertEquals(1, chunks.size());
@@ -261,13 +261,14 @@ class BillTextParserTest {
         String csv = "导出信息：\n共5笔记录\n" + header + "\n" + row1 + "\n" + row2 + "\n" + row3 + "\n" + row4 + "\n" + row5 + "\n";
         String table = ExcelTextExtractor.tableText(csv.getBytes(java.nio.charset.Charset.forName("GBK")), "支付宝交易明细.csv");
         assertTrue(table.startsWith("交易时间"));
-        assertFalse(table.contains("交易订单号"));
+        assertTrue(table.contains("交易订单号"));
         DifyParseResult r = BillTextParser.parse(table);
         assertTrue(r.isRelevant());
         assertEquals(2, r.getRecords().size());
         assertEquals(new BigDecimal("47.80"), r.getRecords().get(0).get("amount"));
         assertEquals("盒马", r.getRecords().get(0).get("merchant"));
         assertEquals("支付宝", r.getRecords().get(0).get("payMethod"));
+        assertEquals("202608310001", r.getRecords().get(0).get("orderNo"));
         assertEquals("测试超市", r.getRecords().get(1).get("merchant"));
         assertEquals("家庭买菜", BillCategoryHints.guess(2, "测试超市", "总部"));
         assertEquals("零食水果", BillCategoryHints.guess(2, "张朋飞", "售货柜_可口可乐"));
@@ -370,4 +371,57 @@ class BillTextParserTest {
         String raw = "好的，结果如下：\n```json\n{\"relevant\":true,\"records\":[]}\n```\n";
         assertEquals("{\"relevant\":true,\"records\":[]}", DifyClient.extractJson(raw));
     }
+
+    @Test
+    void extractJsonStripsThinkAndTakesFirstObject() {
+        String raw = """
+                {
+                  "relevant": true,
+                  "reason": "",
+                  "records": [{"type": 2, "amount": 28.5, "recordDate": "2026-08-03", "merchant": "海底捞"}]
+                }
+
+                recordDate: "2026-08-03" etc.
+
+                是否可能盒马鲜生分类“家庭买菜”还是“日用品”？盒马鲜生通常生鲜超市，家庭买菜更合适。
+
+                确保 amount number 28.5, 102, 4, 35.
+
+                最终只输出 JSON。不要代码块。
+                </think>{
+                  "relevant": true,
+                  "reason": "",
+                  "records": [
+                    {"type": 2, "amount": 28.5, "recordDate": "2026-08-03", "merchant": "海底捞"},
+                    {"type": 2, "amount": 102, "recordDate": "2026-08-05", "merchant": "盒马鲜生"}
+                  ]
+                }
+                """;
+        String json = DifyClient.extractJson(raw);
+        assertTrue(json.startsWith("{"));
+        assertFalse(json.contains("</think>"));
+        assertFalse(json.contains("家庭买菜还是"));
+        assertTrue(json.contains("\"relevant\""));
+        assertTrue(json.contains("盒马鲜生"));
+        assertTrue(json.contains("102"));
+    }
+
+    @Test
+    void extractJsonStripsWrappedThinkBlock() {
+        String raw = "<think>先分析金额贰拾捌元伍角=28.5</think>{\"relevant\":true,\"reason\":\"\",\"records\":[{\"amount\":28.5}]}";
+        assertEquals("{\"relevant\":true,\"reason\":\"\",\"records\":[{\"amount\":28.5}]}", DifyClient.extractJson(raw));
+    }
+
+    @Test
+    void parseOrderNoColumn() {
+        String tsv = "日期\t类型\t金额\t商家\t订单号\n"
+                + "2026-08-01\t支出\t10\t超市\tORD-88\n"
+                + "2026-08-01\t支出\t99\t便利店\t\n";
+        DifyParseResult r = BillTextParser.parse(tsv);
+        assertTrue(r.isRelevant());
+        assertEquals(2, r.getRecords().size());
+        assertEquals("ORD-88", r.getRecords().get(0).get("orderNo"));
+        assertEquals("", r.getRecords().get(1).get("orderNo"));
+    }
+
 }

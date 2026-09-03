@@ -17,6 +17,13 @@ spring:
     multipart:
       max-file-size: 12MB
       max-request-size: 120MB
+  flyway:
+    enabled: true
+    encoding: UTF-8
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    # 已有 gjp 库第一次启动：标成 V1，只跑 V2+。禁止用 schema.sql 对已有库建表。
 
 mybatis:
   configuration:
@@ -41,6 +48,13 @@ gjp:
     text-var: text_content
     categories-var: categories
     timeout-seconds: 180
+    # 智能分析 / 账单搜索各自一把 Key，不要复用 DIFY_API_KEY
+    analysis-api-key: ${DIFY_ANALYSIS_API_KEY:}
+    analysis-base-url: ${DIFY_ANALYSIS_BASE_URL:}
+    analysis-timeout-seconds: 60
+    search-api-key: ${DIFY_SEARCH_API_KEY:}
+    search-base-url: ${DIFY_SEARCH_BASE_URL:}
+    search-timeout-seconds: 60
   qwen:
     base-url: ${QWEN_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     api-key: ${DASHSCOPE_API_KEY:}

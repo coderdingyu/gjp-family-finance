@@ -2,7 +2,10 @@ package com.gjp.stat;
 
 import com.gjp.common.UserContext;
 import com.gjp.entity.Member;
+import com.gjp.entity.Record;
+import com.gjp.record.RecordQuery;
 import com.gjp.mapper.MemberMapper;
+import com.gjp.mapper.RecordMapper;
 import com.gjp.mapper.StatMapper;
 import com.gjp.stat.vo.AmountItem;
 import com.gjp.stat.vo.BudgetVO;
@@ -13,9 +16,14 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +48,8 @@ public class StatService {
     private StatMapper statMapper;
     @Autowired
     private MemberMapper memberMapper;
+    @Autowired
+    private RecordMapper recordMapper;
 
     /** 关键指标卡：收入、支出、结余、笔数、月均、单笔最大支出、人情往来支出 */
     public OverviewVO overview(DateRange range, Long requestedMemberId) {
@@ -240,6 +250,112 @@ public class StatService {
             return now;
         }
         return now.isAfter(end) ? end : start;
+    }
+
+
+    /**
+     * 个人看板。始终按当前登录人自己的 memberId 统计（户主也不看全家）。
+     * 日期按 Asia/Shanghai；本周为周一至周日，合计截到今天。
+     */
+    public Map<String, Object> personal() {
+        Long memberId = UserContext.requireOwnMemberId();
+        ZoneId zone = ZoneId.of("Asia/Shanghai");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        YearMonth ym = YearMonth.from(today);
+        LocalDate monthStart = ym.atDay(1);
+
+        DateRange weekFull = DateRange.of(weekStart, weekEnd, null, null);
+        DateRange monthToToday = DateRange.of(monthStart, today, null, null);
+
+        OverviewVO monthOv = overview(monthToToday, memberId);
+
+        YearMonth lastYm = ym.minusMonths(1);
+        DateRange lastMonth = DateRange.ofMonth(lastYm);
+        OverviewVO lastOv = overview(lastMonth, memberId);
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("memberId", memberId);
+        map.put("memberName", memberName(memberId));
+        map.put("today", today.toString());
+        map.put("weekStart", weekStart.toString());
+        map.put("weekEnd", weekEnd.toString());
+        map.put("weekRule", "周一至周日（Asia/Shanghai），合计截到今天");
+        map.put("month", monthToToday.toString());
+        map.put("todayExpense", statMapper.sumAmount(UserContext.getFamilyId(), 2, today, today, memberId));
+        map.put("todayIncome", statMapper.sumAmount(UserContext.getFamilyId(), 1, today, today, memberId));
+        map.put("weekExpense", statMapper.sumAmount(UserContext.getFamilyId(), 2, weekStart, today, memberId));
+        map.put("monthIncome", monthOv.getTotalIncome());
+        map.put("monthExpense", monthOv.getTotalExpense());
+        map.put("monthBalance", monthOv.getBalance());
+        map.put("monthCount", monthOv.getRecordCount());
+        map.put("overview", monthOv);
+        map.put("expenseCategory", categoryStat(2, monthToToday, memberId));
+        map.put("lastMonth", lastMonth.toString());
+        map.put("lastMonthLabel", lastYm.toString());
+        map.put("lastMonthIncome", lastOv.getTotalIncome());
+        map.put("lastMonthExpense", lastOv.getTotalExpense());
+        map.put("lastMonthBalance", lastOv.getBalance());
+        map.put("lastMonthCount", lastOv.getRecordCount());
+        if (lastOv.getMaxExpense() != null) {
+            map.put("lastMonthMaxExpense", lastOv.getMaxExpense());
+        }
+        if (lastOv.getGiftExpense() != null) {
+            map.put("lastMonthGiftExpense", lastOv.getGiftExpense());
+        }
+        map.put("lastExpenseCategory", categoryStat(2, lastMonth, memberId));
+        BigDecimal thisExpense = monthOv.getTotalExpense() == null ? BigDecimal.ZERO : monthOv.getTotalExpense();
+        BigDecimal prevExpense = lastOv.getTotalExpense() == null ? BigDecimal.ZERO : lastOv.getTotalExpense();
+        BigDecimal thisBalance = monthOv.getBalance() == null ? BigDecimal.ZERO : monthOv.getBalance();
+        BigDecimal prevBalance = lastOv.getBalance() == null ? BigDecimal.ZERO : lastOv.getBalance();
+        map.put("monthExpenseChange", thisExpense.subtract(prevExpense));
+        map.put("monthBalanceChange", thisBalance.subtract(prevBalance));
+        map.put("weekDaily", fillDaily(weekFull, memberId));
+        map.put("monthDaily", fillDaily(monthToToday, memberId));
+        map.put("budget", budgetStat(ym, memberId));
+        map.put("budgetMonth", ym.toString());
+
+        RecordQuery q = new RecordQuery();
+        q.setMemberId(memberId);
+        q.setPageNum(1);
+        q.setPageSize(5);
+        q.setOffset(0);
+        map.put("recent", recordMapper.selectByQuery(UserContext.getFamilyId(), q));
+        return map;
+    }
+
+    /** 按日收支，缺日补 0。本周图会补到周日（未到的日子为 0）。 */
+    List<MonthAmount> fillDaily(DateRange range, Long requestedMemberId) {
+        Long familyId = UserContext.getFamilyId();
+        Long memberId = UserContext.resolveMemberId(requestedMemberId);
+        List<MonthAmount> rows = statMapper.selectDailyTrend(
+                familyId, range.getStart(), range.getEnd(), memberId);
+        Map<String, MonthAmount> byDay = new HashMap<>();
+        for (MonthAmount m : rows) {
+            m.setBalance(m.getIncome().subtract(m.getExpense()));
+            byDay.put(m.getYm(), m);
+        }
+        List<MonthAmount> full = new ArrayList<>();
+        LocalDate cursor = range.getStart();
+        LocalDate last = range.getEnd();
+        if (last.isBefore(cursor)) {
+            last = cursor;
+        }
+        while (!cursor.isAfter(last)) {
+            String key = cursor.toString();
+            MonthAmount m = byDay.get(key);
+            if (m == null) {
+                m = new MonthAmount();
+                m.setYm(key);
+                m.setIncome(BigDecimal.ZERO);
+                m.setExpense(BigDecimal.ZERO);
+                m.setBalance(BigDecimal.ZERO);
+            }
+            full.add(m);
+            cursor = cursor.plusDays(1);
+        }
+        return full;
     }
 
     private String memberName(Long memberId) {

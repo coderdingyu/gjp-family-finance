@@ -37,6 +37,16 @@ public class RecordController {
         return Result.ok(recordService.page(query));
     }
 
+    /**
+     * 自然语言问答 / 搜索。返回 {answer, query, page}。
+     * 智能体只解释问题，真正查库仍走 page()，权限与家庭隔离不变。
+     */
+    @PostMapping("/ask")
+    public Result<Map<String, Object>> ask(@RequestBody(required = false) RecordAskRequest body) {
+        RecordAskRequest req = body == null ? new RecordAskRequest() : body;
+        return Result.ok(recordService.ask(req.getQ(), req.getMemberId()));
+    }
+
     @GetMapping("/{id}")
     public Result<Record> detail(@PathVariable Long id) {
         return Result.ok(recordService.detail(id));

@@ -112,6 +112,19 @@ public class UserContext {
         return scope != null ? scope : requested;
     }
 
+    /**
+     * 当前登录人绑定的成员ID。户主也强制成自己，不看全家。
+     * 个人看板等「只看我」的入口用这个，而不是 {@link #resolveMemberId(Long)}。
+     */
+    public static Long requireOwnMemberId() {
+        requireFamilyMember();
+        LoginUser u = get();
+        if (u.getMemberId() == null) {
+            throw new BizException(403, "当前账号未绑定家庭成员，请联系户主处理");
+        }
+        return u.getMemberId();
+    }
+
     /** 要求户主及以上权限，否则抛 403 */
     public static void requireOwner() {
         if (!isOwner()) {
@@ -141,6 +154,8 @@ public class UserContext {
         private Integer role;
         /** 角色中文名，前端直接显示 */
         private String roleName;
+        /** 登录时的 sessionVersion，拦截器与库中当前值比较 */
+        private Integer sessionVersion;
 
         public LoginUser() {
         }
@@ -224,6 +239,14 @@ public class UserContext {
 
         public void setFamilyName(String familyName) {
             this.familyName = familyName;
+        }
+
+        public Integer getSessionVersion() {
+            return sessionVersion;
+        }
+
+        public void setSessionVersion(Integer sessionVersion) {
+            this.sessionVersion = sessionVersion;
         }
     }
 }

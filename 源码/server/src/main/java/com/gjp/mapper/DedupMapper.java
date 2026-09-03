@@ -57,4 +57,34 @@ public interface DedupMapper {
                                         @Param("sameCategory") boolean sameCategory,
                                         @Param("startDate") String startDate,
                                         @Param("endDate") String endDate);
+
+    /**
+     * 两边都有非空订单号且忽略大小写相同：强重复，不看金额/日期/商家。
+     * 只有一边有订单号的不在这里，仍走 {@link #findPairs}。
+     */
+    @Select("<script>"
+            + "SELECT a.id AS idA, b.id AS idB, "
+            + "       ABS(DATEDIFF(a.record_date, b.record_date)) AS dayDiff, "
+            + "       a.amount AS amount "
+            + "FROM t_record a JOIN t_record b "
+            + "  ON a.family_id = b.family_id "
+            + " AND a.id <![CDATA[<]]> b.id "
+            + " AND a.order_no IS NOT NULL AND TRIM(a.order_no) <![CDATA[<>]]> '' "
+            + " AND b.order_no IS NOT NULL AND TRIM(b.order_no) <![CDATA[<>]]> '' "
+            + " AND LOWER(TRIM(a.order_no)) = LOWER(TRIM(b.order_no)) "
+            + "<if test='sameMember'> AND a.member_id = b.member_id </if>"
+            + "WHERE a.family_id = #{familyId} "
+            + "<if test='memberId != null'> AND a.member_id = #{memberId} AND b.member_id = #{memberId} </if>"
+            + "<if test='startDate != null'> AND a.record_date <![CDATA[>=]]> #{startDate} "
+            + "     AND b.record_date <![CDATA[>=]]> #{startDate} </if>"
+            + "<if test='endDate != null'> AND a.record_date <![CDATA[<=]]> #{endDate} "
+            + "     AND b.record_date <![CDATA[<=]]> #{endDate} </if>"
+            + "ORDER BY a.id "
+            + "LIMIT 2000"
+            + "</script>")
+    List<Map<String, Object>> findOrderNoPairs(@Param("familyId") Long familyId,
+                                               @Param("memberId") Long memberId,
+                                               @Param("sameMember") boolean sameMember,
+                                               @Param("startDate") String startDate,
+                                               @Param("endDate") String endDate);
 }

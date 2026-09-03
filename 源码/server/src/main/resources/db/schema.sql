@@ -40,6 +40,7 @@ CREATE TABLE t_user (
     member_id    BIGINT                DEFAULT NULL   COMMENT '绑定的家庭成员ID，普通成员据此做数据隔离',
     role         TINYINT      NOT NULL DEFAULT 0      COMMENT '角色：0=普通成员 1=户主 2=系统管理员',
     status       TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1=正常 0=已禁用（禁用后不能登录）',
+    session_version INT       NOT NULL DEFAULT 0      COMMENT '登录会话版本；禁用时加一，已登录请求对不上即踢下线',
     last_login   DATETIME              DEFAULT NULL   COMMENT '最后登录时间',
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
@@ -106,11 +107,13 @@ CREATE TABLE t_record (
     pay_method   VARCHAR(20)            DEFAULT NULL  COMMENT '支付方式：现金/微信/支付宝/银行卡',
     is_gift      TINYINT       NOT NULL DEFAULT 0     COMMENT '是否人情往来：1=是 0=否',
     remark       VARCHAR(255)           DEFAULT NULL  COMMENT '备注',
+    order_no     VARCHAR(64)            DEFAULT NULL  COMMENT '订单号/商单号/交易单号，查重用，可空',
     create_time  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
     KEY idx_family_date (family_id, record_date),
     KEY idx_category (category_id),
-    KEY idx_member (member_id)
+    KEY idx_member (member_id),
+    KEY idx_family_order (family_id, order_no)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '收支流水表';
 
 -- ------------------------------------------------------------
@@ -239,6 +242,7 @@ CREATE TABLE t_import_item (
     pay_method     VARCHAR(20)            DEFAULT NULL   COMMENT '支付方式',
     is_gift        TINYINT       NOT NULL DEFAULT 0      COMMENT '是否人情往来',
     remark         VARCHAR(255)           DEFAULT NULL   COMMENT '备注',
+    order_no       VARCHAR(64)            DEFAULT NULL   COMMENT '订单号/商单号/交易单号',
     PRIMARY KEY (id),
     KEY idx_job (job_id),
     KEY idx_file (file_id)

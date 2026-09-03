@@ -1,6 +1,7 @@
 import request from '../utils/request'
 
 export const dashboard = (params) => request.get('/stat/dashboard', { params })
+export const personalBoard = () => request.get('/stat/personal')
 export const overview = (params) => request.get('/stat/overview', { params })
 export const trend = (params) => request.get('/stat/trend', { params })
 export const categoryStat = (params) => request.get('/stat/category', { params })

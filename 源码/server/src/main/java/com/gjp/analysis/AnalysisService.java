@@ -1,17 +1,23 @@
 package com.gjp.analysis;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gjp.common.UserContext;
+import com.gjp.dify.DifyProperties;
+import com.gjp.dify.DifyWorkflowClient;
 import com.gjp.mapper.StatMapper;
 import com.gjp.stat.DateRange;
 import com.gjp.stat.StatService;
 import com.gjp.stat.vo.AmountItem;
 import com.gjp.stat.vo.BudgetVO;
 import com.gjp.stat.vo.MonthAmount;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +38,8 @@ import java.util.Map;
 @Service
 public class AnalysisService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalysisService.class);
+
     /** 某月支出超过月均这个倍数即判定为异常月份 */
     private static final BigDecimal ABNORMAL_MONTH_RATIO = new BigDecimal("1.30");
     /** 单一商家消费占比超过该百分比即提示消费集中 */
@@ -49,6 +57,12 @@ public class AnalysisService {
     private StatMapper statMapper;
     @Autowired
     private StatService statService;
+    @Autowired
+    private DifyProperties difyProperties;
+    @Autowired
+    private DifyWorkflowClient workflowClient;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 生成分析报告。返回列表按严重程度排序：danger 在前，good 在后，
@@ -71,7 +85,7 @@ public class AnalysisService {
             items.add(new AnalysisItem("A0", "info", "所选区间内没有收支记录",
                     "区间 " + range + " 的收入与支出均为 0。",
                     "请先在【收支录入】中登记流水，或把统计区间调整到有数据的年份。"));
-            return items;
+            return polish(items, range, requestedMemberId, memberId, totalIncome, totalExpense, trend);
         }
 
         analyzeAbnormalMonth(items, trend, range, memberId);
@@ -83,21 +97,142 @@ public class AnalysisService {
         analyzeArea(items, range, requestedMemberId);
         analyzeGift(items, range, totalExpense, memberId);
 
-        items.sort((a, b) -> weight(a.getLevel()) - weight(b.getLevel()));
-        return items;
+        AnalysisItems.sort(items);
+        return polish(items, range, requestedMemberId, memberId, totalIncome, totalExpense, trend);
+    }
+
+    public boolean agentConfigured() {
+        return difyProperties != null && difyProperties.analysisConfigured();
+    }
+
+    /**
+     * 把本地命中的规则快照交给 Dify 工作流润色 A* 并追加 S0/S1/S2。
+     * 未配置、超时、坏 JSON 一律回退本地 A* 文案（不带额外 S 条目）。
+     */
+    private List<AnalysisItem> polish(List<AnalysisItem> local, DateRange range, Long requestedMemberId,
+                                      Long memberId, BigDecimal totalIncome, BigDecimal totalExpense,
+                                      List<MonthAmount> trend) {
+        AnalysisItems.sort(local);
+        if (difyProperties == null || !difyProperties.analysisConfigured()) {
+            return local;
+        }
+        try {
+            Map<String, Object> snapshot = buildSnapshot(
+                    local, range, requestedMemberId, memberId, totalIncome, totalExpense, trend);
+            String raw = workflowClient.run(
+                    difyProperties.analysisBaseUrlOrDefault(),
+                    difyProperties.getAnalysisApiKey(),
+                    "gjp-u" + UserContext.getUserId(),
+                    difyProperties.getAnalysisTimeoutSeconds(),
+                    Map.of(
+                            "snapshot", objectMapper.writeValueAsString(snapshot),
+                            "rule_table", AnalysisItems.RULE_TABLE
+                    ));
+            List<AnalysisItem> merged = AnalysisItems.merge(local, raw);
+            AnalysisItems.sort(merged);
+            return merged;
+        } catch (Exception e) {
+            log.warn("智能分析智能体失败，回退本机文案：{}", e.getMessage());
+            return local;
+        }
+    }
+
+    private Map<String, Object> buildSnapshot(List<AnalysisItem> local, DateRange range, Long requestedMemberId,
+                                              Long memberId, BigDecimal totalIncome, BigDecimal totalExpense,
+                                              List<MonthAmount> trend) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("range", range.toString());
+        snapshot.put("today", LocalDate.now().toString());
+        snapshot.put("scope", memberId == null ? "family" : "member");
+        Map<String, Object> totals = new LinkedHashMap<>();
+        totals.put("income", totalIncome);
+        totals.put("expense", totalExpense);
+        totals.put("balance", totalIncome.subtract(totalExpense));
+        snapshot.put("totals", totals);
+        snapshot.put("monthlyTrend", compactTrend(trend, 12));
+        snapshot.put("topCategories", compactAmount(statService.categoryStat(2, range, requestedMemberId), 8));
+        snapshot.put("topMerchants", compactAmount(statService.merchantRank(range, 8, requestedMemberId), 8));
+        snapshot.put("budgetRows", budgetSnapshot(range, requestedMemberId, 8));
+        BigDecimal gift = statMapper.sumGiftExpense(
+                UserContext.getFamilyId(), range.getStart(), range.getEnd(), memberId);
+        Map<String, Object> giftMap = new LinkedHashMap<>();
+        giftMap.put("amount", gift);
+        giftMap.put("ratio", divide(gift.multiply(BigDecimal.valueOf(100)), totalExpense));
+        snapshot.put("gift", giftMap);
+        snapshot.put("areaStats", compactAmount(statService.areaStat(range, requestedMemberId), 8));
+        if (memberId == null) {
+            snapshot.put("memberSplit", compactAmount(statService.memberStat(2, range, requestedMemberId), 8));
+        }
+        snapshot.put("fired", local);
+        return snapshot;
+    }
+
+    private List<Map<String, Object>> compactTrend(List<MonthAmount> trend, int cap) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (trend == null || trend.isEmpty()) {
+            return out;
+        }
+        int from = Math.max(0, trend.size() - cap);
+        for (int i = from; i < trend.size(); i++) {
+            MonthAmount m = trend.get(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("ym", m.getYm());
+            row.put("income", m.getIncome());
+            row.put("expense", m.getExpense());
+            row.put("balance", m.getBalance());
+            out.add(row);
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> compactAmount(List<AmountItem> items, int cap) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (items == null) {
+            return out;
+        }
+        for (int i = 0; i < Math.min(cap, items.size()); i++) {
+            AmountItem a = items.get(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", a.getName());
+            row.put("amount", a.getAmount());
+            row.put("ratio", a.getRatio());
+            row.put("count", a.getCount());
+            out.add(row);
+        }
+        return out;
+    }
+
+    private List<Map<String, Object>> budgetSnapshot(DateRange range, Long requestedMemberId, int cap) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        YearMonth last = YearMonth.from(range.effectiveEnd());
+        YearMonth cursor = YearMonth.from(range.getStart());
+        YearMonth earliest = last.minusMonths(5);
+        if (cursor.isBefore(earliest)) {
+            cursor = earliest;
+        }
+        for (YearMonth ym = cursor; !ym.isAfter(last) && rows.size() < cap; ym = ym.plusMonths(1)) {
+            for (BudgetVO b : statService.budgetStat(ym, requestedMemberId)) {
+                if ("未设预算".equals(b.getStatus())) {
+                    continue;
+                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("ym", ym.toString());
+                row.put("memberName", b.getMemberName());
+                row.put("budget", b.getBudget());
+                row.put("expense", b.getExpense());
+                row.put("usedRate", b.getUsedRate());
+                row.put("status", b.getStatus());
+                rows.add(row);
+                if (rows.size() >= cap) {
+                    break;
+                }
+            }
+        }
+        return rows;
     }
 
     private int weight(String level) {
-        switch (level == null ? "" : level) {
-            case "danger":
-                return 0;
-            case "warning":
-                return 1;
-            case "info":
-                return 2;
-            default:
-                return 3;
-        }
+        return AnalysisItems.weight(level);
     }
 
     /**
@@ -375,7 +510,7 @@ public class AnalysisService {
                         ? "消费明显集中在【" + top.getName() + "】片区，占比 " + top.getRatio() + "%"
                         : "消费分布在 " + areas.size() + " 个片区，最高的是【" + top.getName() + "】",
                 basis.toString(),
-                "片区分布可以反映生活半径。若某片区占比过高且并非居住地附近，建议核对是否有通勤或应酬造成的额外支出。"));
+                "片区是课纲要求的可选维度，填写不规范时结论参考即可。若某片区占比过高且并非居住地附近，可顺带核对通勤或应酬支出。"));
     }
 
     /** A8 人情往来专项分析，对应课程要求"朋友间礼尚往来的消费有多少"。 */

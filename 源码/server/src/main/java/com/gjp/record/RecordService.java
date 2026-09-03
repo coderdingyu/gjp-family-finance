@@ -1,24 +1,35 @@
 package com.gjp.record;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gjp.common.BizException;
 import com.gjp.common.LikeEscape;
 import com.gjp.common.PageResult;
 import com.gjp.common.UserContext;
+import com.gjp.dify.DifyProperties;
+import com.gjp.dify.DifyWorkflowClient;
 import com.gjp.entity.Category;
+import com.gjp.entity.Member;
 import com.gjp.entity.Record;
 import com.gjp.mapper.CategoryMapper;
 import com.gjp.mapper.MemberMapper;
 import com.gjp.log.OperationLogService;
 import com.gjp.mapper.RecordMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 收支流水业务（核心模块）。
@@ -35,8 +46,13 @@ import java.util.Map;
 @Service
 public class RecordService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecordService.class);
+
     /** 允许的支付方式，与前端下拉框保持一致 */
     private static final List<String> PAY_METHODS = List.of("现金", "微信", "支付宝", "银行卡", "其他");
+
+    /** 送给智能体的流水快照上限，避免把全家账本整表送出去 */
+    private static final int ASK_SNAPSHOT_CAP = 200;
 
     /** 单笔金额上限，防止手滑多输几个 0 把统计图拉爆 */
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("99999999.99");
@@ -49,6 +65,12 @@ public class RecordService {
     private CategoryMapper categoryMapper;
     @Autowired
     private OperationLogService logService;
+    @Autowired
+    private DifyProperties difyProperties;
+    @Autowired
+    private DifyWorkflowClient workflowClient;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /** 分页查询 + 当前条件下的收支合计（合计是按全部匹配记录算的，不是只算当前页） */
     public Map<String, Object> page(RecordQuery q) {
@@ -67,6 +89,187 @@ public class RecordService {
         result.put("sumExpense", recordMapper.sumAmountByQuery(familyId, q, 2));
         result.put("scopeLocked", UserContext.scopeMemberId() != null);
         return result;
+    }
+
+    /**
+     * 自然语言问答。智能体只负责解释问题并生成 RecordQuery，
+     * 真正查库仍走 {@link #page(RecordQuery)}，所以权限收敛不会被 prompt 绕过。
+     */
+    public Map<String, Object> ask(String q, Long requestedMemberId) {
+        UserContext.requireFamilyMember();
+        String question = RecordAskParser.clip(q);
+        if (question.isEmpty()) {
+            throw new BizException("请输入要查询的内容");
+        }
+
+        Long familyId = UserContext.getFamilyId();
+        Long selfScope = UserContext.scopeMemberId();
+        boolean owner = selfScope == null;
+        Long requested = UserContext.resolveMemberId(requestedMemberId);
+
+        List<Category> cats = categoryMapper.selectByFamily(familyId, null);
+        List<Member> members = memberMapper.selectByFamily(familyId);
+        if (!owner) {
+            List<Member> mine = new ArrayList<>();
+            for (Member m : members) {
+                if (selfScope.equals(m.getId())) {
+                    mine.add(m);
+                }
+            }
+            members = mine;
+        }
+        Set<Long> visibleIds = new HashSet<>();
+        for (Member m : members) {
+            visibleIds.add(m.getId());
+        }
+
+        RecordAskParser.AskDraft draft = null;
+        boolean agent = false;
+        if (difyProperties != null && difyProperties.searchConfigured()) {
+            try {
+                String snapshot = buildAskSnapshot(familyId, requested, cats, members);
+                String raw = workflowClient.run(
+                        difyProperties.searchBaseUrlOrDefault(),
+                        difyProperties.getSearchApiKey(),
+                        "gjp-u" + UserContext.getUserId(),
+                        difyProperties.getSearchTimeoutSeconds(),
+                        Map.of(
+                                "question", question,
+                                "snapshot", snapshot,
+                                "today", LocalDate.now().toString()
+                        ));
+                draft = RecordAskParser.parseDify(raw);
+                agent = true;
+            } catch (Exception e) {
+                log.warn("账单搜索智能体失败，回退本机解析：{}", e.getMessage());
+            }
+        }
+        if (draft == null) {
+            draft = RecordAskParser.parseLocal(question, cats, members);
+        }
+
+        RecordQuery query = draft.query;
+        RecordAskParser.bindCategoryName(query, draft.categoryName, cats);
+        if (query.getCategoryId() != null) {
+            boolean ok = false;
+            for (Category c : cats) {
+                if (query.getCategoryId().equals(c.getId())) {
+                    ok = true;
+                    break;
+                }
+            }
+            if (!ok) {
+                query.setCategoryId(null);
+            }
+        }
+        query.setMemberId(RecordAskGuard.sanitizeMemberId(
+                query.getMemberId(), requestedMemberId, owner,
+                selfScope, visibleIds));
+        query.setPageNum(1);
+        if (query.getPageSize() == null) {
+            query.setPageSize(10);
+        }
+
+        Map<String, Object> page = page(copyQuery(query));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("answer", draft.answer);
+        result.put("query", RecordAskParser.publicQuery(query));
+        result.put("page", page);
+        result.put("agent", agent);
+        return result;
+    }
+
+    public boolean searchAgentConfigured() {
+        return difyProperties != null && difyProperties.searchConfigured();
+    }
+
+    private RecordQuery copyQuery(RecordQuery src) {
+        RecordQuery q = new RecordQuery();
+        q.setType(src.getType());
+        q.setMemberId(src.getMemberId());
+        q.setCategoryId(src.getCategoryId());
+        q.setStartDate(src.getStartDate());
+        q.setEndDate(src.getEndDate());
+        q.setKeyword(src.getKeyword());
+        q.setPayMethod(src.getPayMethod());
+        q.setArea(src.getArea());
+        q.setIsGift(src.getIsGift());
+        q.setMinAmount(src.getMinAmount());
+        q.setMaxAmount(src.getMaxAmount());
+        q.setPageNum(src.getPageNum());
+        q.setPageSize(src.getPageSize());
+        return q;
+    }
+
+    /**
+     * 权限内快照：只含当前家庭、当前可见成员，最多 200 行。
+     * 不带 familyId，避免把隔离键交给模型。
+     */
+    private String buildAskSnapshot(Long familyId, Long memberId,
+                                    List<Category> cats, List<Member> members) throws Exception {
+        RecordQuery snap = new RecordQuery();
+        snap.setMemberId(memberId);
+        snap.setPageNum(1);
+        snap.setPageSize(ASK_SNAPSHOT_CAP);
+        snap.setOffset(0);
+        long total = recordMapper.countByQuery(familyId, snap);
+        List<Record> rows = total == 0 ? List.of() : recordMapper.selectByQuery(familyId, snap);
+
+        List<Map<String, Object>> recs = new ArrayList<>();
+        for (Record r : rows) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("date", r.getRecordDate() == null ? null : r.getRecordDate().toString());
+            row.put("type", r.getType() != null && r.getType() == 1 ? "收入" : "支出");
+            row.put("amount", r.getAmount());
+            row.put("member", r.getMemberName());
+            row.put("memberId", r.getMemberId());
+            row.put("category", categoryPath(r));
+            row.put("categoryId", r.getCategoryId());
+            row.put("merchant", r.getMerchant());
+            row.put("area", r.getArea());
+            row.put("payMethod", r.getPayMethod());
+            row.put("gift", r.getIsGift() != null && r.getIsGift() == 1);
+            row.put("remark", cut(r.getRemark(), 40));
+            recs.add(row);
+        }
+
+        List<Map<String, Object>> memberCat = new ArrayList<>();
+        for (Member m : members) {
+            Map<String, Object> mm = new LinkedHashMap<>();
+            mm.put("id", m.getId());
+            mm.put("name", m.getMemberName());
+            memberCat.add(mm);
+        }
+        List<Map<String, Object>> catCat = new ArrayList<>();
+        for (Category c : cats) {
+            Map<String, Object> cc = new LinkedHashMap<>();
+            cc.put("id", c.getId());
+            cc.put("name", c.getCategoryName());
+            cc.put("type", c.getType());
+            cc.put("level", c.getLevel());
+            catCat.add(cc);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("today", LocalDate.now().toString());
+        payload.put("scope", memberId == null ? "family" : "member");
+        payload.put("total", total);
+        payload.put("shown", recs.size());
+        payload.put("truncated", total > recs.size());
+        payload.put("sumIncome", recordMapper.sumAmountByQuery(familyId, snap, 1));
+        payload.put("sumExpense", recordMapper.sumAmountByQuery(familyId, snap, 2));
+        payload.put("members", memberCat);
+        payload.put("categories", catCat);
+        payload.put("records", recs);
+        return objectMapper.writeValueAsString(payload);
+    }
+
+    private static String cut(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.length() <= max ? t : t.substring(0, max);
     }
 
     /** 兜底分页参数，避免前端传 0 或负数导致 SQL 报错，也避免一次拉几万条 */
@@ -154,7 +357,8 @@ public class RecordService {
                 summary("删除", before));
     }
 
-    /** 批量删除，查重功能里用户勾选多条后一次删掉 */
+    /** 批量删除，查重功能里用户勾选多条后一次删掉。整批同一事务，避免半组删掉。 */
+    @Transactional(rollbackFor = Exception.class)
     public int deleteBatch(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             throw new BizException("请选择要删除的流水");
@@ -280,6 +484,21 @@ public class RecordService {
         }
         record.setMerchant(trim(record.getMerchant()));
         record.setArea(trim(record.getArea()));
+        record.setOrderNo(normalizeOrderNo(record.getOrderNo()));
+    }
+
+    public static String normalizeOrderNo(String s) {
+        if (s == null) {
+            return null;
+        }
+        String n = s.trim();
+        if (n.isEmpty()) {
+            return null;
+        }
+        if (n.length() > 64) {
+            throw new BizException("订单号不能超过 64 个字符");
+        }
+        return n;
     }
 
     private String trim(String s) {

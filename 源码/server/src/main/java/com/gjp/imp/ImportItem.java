@@ -21,6 +21,7 @@ public class ImportItem {
     private String payMethod;
     private Integer isGift;
     private String remark;
+    private String orderNo;
     private String sourceName;
     /** 仅详情接口填充：ledger=与账本重复，batch=与本次其他文件重复 */
     private String duplicateKind;
@@ -152,6 +153,14 @@ public class ImportItem {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public String getOrderNo() {
+        return orderNo;
+    }
+
+    public void setOrderNo(String orderNo) {
+        this.orderNo = orderNo;
     }
 
     public String getSourceName() {

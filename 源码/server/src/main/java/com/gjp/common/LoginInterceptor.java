@@ -37,11 +37,13 @@ public class LoginInterceptor implements HandlerInterceptor {
             return false;
         }
         User db = userMapper.selectById(loginUser.getUserId());
-        if (db == null || (db.getStatus() != null && db.getStatus() == 0)) {
+        int liveVer = db == null || db.getSessionVersion() == null ? 0 : db.getSessionVersion();
+        int heldVer = loginUser.getSessionVersion() == null ? 0 : loginUser.getSessionVersion();
+        if (db == null || (db.getStatus() != null && db.getStatus() == 0) || liveVer != heldVer) {
             // 只踢这个账号的槽位，不能整个 session 作废：
-            // 同一浏览器别的标签页可能正登着别的账号，不该被连带踢下线。
+            // 同一浏览器别的标签页可能正登着别的账号（例如管理员），不该被连带踢下线。
             AuthSlots.removeByUser(request, loginUser.getUserId());
-            writeUnauthorized(response, "账号已被禁用或已失效");
+            writeUnauthorized(response, "账号已禁用");
             return false;
         }
         UserContext.set(loginUser);

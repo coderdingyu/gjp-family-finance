@@ -273,28 +273,84 @@ public class DifyClient {
         return map;
     }
 
+    /**
+     * 通义思考模式会把草稿 JSON、自然语言和最终 JSON 混在一段里。
+     * Jackson 不能吃整段，必须先剥 think / 代码块，再按括号匹配取出第一个完整对象。
+     */
     public static String extractJson(String raw) {
         if (raw == null) {
             return "{}";
         }
-        String text = raw.trim();
+        String text = stripThink(raw).trim();
+        text = unwrapFence(text);
+        String obj = firstJsonObject(text);
+        return obj != null ? obj : text;
+    }
+
+    static String stripThink(String raw) {
+        String text = raw.replaceAll("(?is)<think\\b[^>]*>.*?</think>", " ");
+        int close = text.lastIndexOf("</think>");
+        if (close >= 0) {
+            String after = text.substring(close + "</think>".length());
+            if (after.indexOf('{') >= 0) {
+                text = after;
+            }
+        }
+        return text.replace("</think>", " ").replace("<think>", " ");
+    }
+
+    static String unwrapFence(String text) {
         int fence = text.indexOf("```");
-        if (fence >= 0) {
-            int start = text.indexOf('\n', fence);
-            int end = text.indexOf("```", fence + 3);
-            if (start > 0 && end > start) {
-                text = text.substring(start + 1, end).trim();
-                if (text.startsWith("json")) {
-                    text = text.substring(4).trim();
+        if (fence < 0) {
+            return text.trim();
+        }
+        int start = text.indexOf('\n', fence);
+        int end = text.indexOf("```", fence + 3);
+        if (start > 0 && end > start) {
+            text = text.substring(start + 1, end).trim();
+            if (text.regionMatches(true, 0, "json", 0, 4)) {
+                text = text.substring(4).trim();
+            }
+        }
+        return text;
+    }
+
+    static String firstJsonObject(String text) {
+        int start = -1;
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (start < 0) {
+                if (c == '{') {
+                    start = i;
+                    depth = 1;
+                }
+                continue;
+            }
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                } else if (c == '\\') {
+                    escape = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return text.substring(start, i + 1);
                 }
             }
         }
-        int obj = text.indexOf('{');
-        int last = text.lastIndexOf('}');
-        if (obj >= 0 && last > obj) {
-            return text.substring(obj, last + 1);
-        }
-        return text;
+        return null;
     }
 
     private static byte[] buildMultipart(String boundary, byte[] file, String filename,

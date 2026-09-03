@@ -47,8 +47,8 @@ public final class BillTextParser {
             "(?<![A-Za-z0-9])([+\\-]?\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})|[+\\-]?\\d{1,7}\\.\\d{2}|[+\\-]?\\d{1,7})(?:元|人民币|CNY|RMB)?");
     private static final Pattern TYPE_WORD = Pattern.compile("收入|支出|不计|income|expense", Pattern.CASE_INSENSITIVE);
 
-    /** 0 date, 1 amount, 2 income, 3 expense, 4 type, 5 category, 6 merchant, 7 area, 8 pay, 9 gift, 10 remark, 11 product, 12 status */
-    private static final int COLS = 13;
+    /** 0 date, 1 amount, 2 income, 3 expense, 4 type, 5 category, 6 merchant, 7 area, 8 pay, 9 gift, 10 remark, 11 product, 12 status, 13 orderNo */
+    private static final int COLS = 14;
 
     private BillTextParser() {
     }
@@ -295,9 +295,8 @@ public final class BillTextParser {
     }
 
     private static boolean skipHeader(String h) {
-        return h.contains("交易单号") || h.contains("商户单号") || h.contains("订单号")
-                || h.contains("流水号") || h.equals("单号") || h.contains("账号")
-                || h.contains("account");
+        return (h.contains("账号") || h.contains("account"))
+                && !h.contains("订单") && !h.contains("单号");
     }
 
     private static int bestRole(String h) {
@@ -316,7 +315,8 @@ public final class BillTextParser {
                 {12, scoreStatus(h)},
                 {6, scoreMerchant(h)},
                 {7, scoreArea(h)},
-                {10, scoreRemark(h)}
+                {10, scoreRemark(h)},
+                {13, scoreOrderNo(h)}
         };
         for (int[] pair : roles) {
             if (pair[1] > score) {
@@ -457,8 +457,25 @@ public final class BillTextParser {
     }
 
     private static int scoreRemark(String h) {
+        if (h.contains("商品说明") || h.contains("订单")) {
+            return 0;
+        }
         if (h.contains("备注") || h.contains("说明") || h.equals("remark") || h.equals("note") || h.equals("memo")) {
             return 3;
+        }
+        return 0;
+    }
+
+    private static int scoreOrderNo(String h) {
+        if (h.contains("交易订单号") || h.contains("交易单号")) {
+            return 6;
+        }
+        if (h.contains("商家订单号") || h.contains("商户单号") || h.contains("商单号")) {
+            return 5;
+        }
+        if (h.contains("订单号") || h.equals("单号") || h.contains("流水号") || h.equals("orderno")
+                || h.equals("orderid") || h.contains("transactionid")) {
+            return 4;
         }
         return 0;
     }
@@ -604,6 +621,8 @@ public final class BillTextParser {
         rec.put("isGift", Math.max(parseGift(cell(cells, cols[9])),
                 Math.max(parseGift(cell(cells, cols[5])), parseGift(cell(cells, cols[6])))));
         rec.put("remark", remark);
+        String orderNo = cell(cells, cols[13]);
+        rec.put("orderNo", orderNo == null || orderNo.isBlank() ? "" : orderNo.trim());
         return rec;
     }
 

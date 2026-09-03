@@ -3,6 +3,20 @@
     <!-- 查询条件 -->
     <div class="page-card">
       <h3 class="card-title">查询条件</h3>
+      <div class="ask-box">
+        <el-input
+          v-model="askQ"
+          placeholder="用自然语言问账本，例如：上个月超过100元的餐饮支出"
+          clearable
+          @keyup.enter="ask"
+        >
+          <template #append>
+            <el-button :loading="asking" @click="ask">问问账本</el-button>
+          </template>
+        </el-input>
+        <div v-if="askAnswer" class="ask-answer">{{ askAnswer }}</div>
+        <div class="ask-hint text-light">不会越权查看其他成员或其他家庭的账本；智能体只解释问题，真正筛选仍走本系统权限。</div>
+      </div>
       <el-form :model="query" label-width="72px" class="query-bar">
         <el-row :gutter="14">
           <el-col :md="6" :sm="12">
@@ -52,7 +66,7 @@
           </el-col>
           <el-col :md="6" :sm="12">
             <el-form-item label="关键字">
-              <el-input v-model="query.keyword" placeholder="商家或备注" clearable />
+              <el-input v-model="query.keyword" placeholder="商家、备注或订单号" clearable />
             </el-form-item>
           </el-col>
           <el-col :md="6" :sm="12">
@@ -105,7 +119,8 @@
         <div class="btns">
           <el-button type="primary" plain :icon="Search" @click="search">查询</el-button>
           <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
-          <el-button type="primary" :icon="Plus" @click="openAdd">录入流水</el-button>
+          <el-button type="primary" :icon="EditPen" @click="openAdd">手动记账</el-button>
+          <el-button type="success" plain :icon="Upload" @click="goImport">文件上传</el-button>
         </div>
       </el-form>
     </div>
@@ -158,6 +173,7 @@
             <span v-else class="text-light">—</span>
           </template>
         </el-table-column>
+        <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
         <el-table-column prop="remark" label="备注" min-width="110" show-overflow-tooltip />
         <el-table-column label="操作" width="118" fixed="right" align="center">
           <template #default="{ row }">
@@ -181,7 +197,7 @@
     </div>
 
     <!-- 录入 / 编辑 -->
-    <el-dialog v-model="dialog" :title="form.id ? '编辑流水' : '录入流水'" width="620px" destroy-on-close>
+    <el-dialog v-model="dialog" :title="form.id ? '编辑流水' : '手动记账'" width="620px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="88px">
         <el-form-item label="收支类型" prop="type">
           <el-radio-group v-model="form.type" @change="onTypeChange">
@@ -283,6 +299,9 @@
             礼金、送礼、请客等往来支出勾选后可做专项分析
           </span>
         </el-form-item>
+        <el-form-item label="订单号/商单号">
+          <el-input v-model="form.orderNo" placeholder="选填，导入账单或查重用" maxlength="64" clearable />
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" show-word-limit />
         </el-form-item>
@@ -297,14 +316,16 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, RefreshLeft, Search } from '@element-plus/icons-vue'
-import { addRecord, deleteRecord, pageRecord, recordOptions, updateRecord } from '../../api/record'
+import { EditPen, RefreshLeft, Search, Upload } from '@element-plus/icons-vue'
+import { addRecord, askRecord, deleteRecord, pageRecord, recordOptions, updateRecord } from '../../api/record'
 import { listMember } from '../../api/member'
 import { treeCategory } from '../../api/category'
 import { money, today, typeText } from '../../utils/format'
 import { currentUser, scopeLocked } from '../../utils/auth'
 
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const list = ref([])
@@ -320,6 +341,9 @@ const query = ref(emptyQuery())
 const dateRange = ref([])
 // 级联组件返回的是路径数组，查询时只取最后一级
 const queryCategory = ref([])
+const askQ = ref('')
+const askAnswer = ref('')
+const asking = ref(false)
 
 function emptyQuery() {
   return {
@@ -364,6 +388,7 @@ function emptyForm() {
     area: null,
     payMethod: null,
     isGift: 0,
+    orderNo: '',
     remark: ''
   }
 }
@@ -440,12 +465,67 @@ function reset() {
   }
   dateRange.value = []
   queryCategory.value = []
+  askAnswer.value = ''
   load()
+}
+
+async function ask() {
+  const q = (askQ.value || '').trim()
+  if (!q) {
+    ElMessage.warning('请输入要查询的内容')
+    return
+  }
+  asking.value = true
+  try {
+    const payload = { q }
+    if (!scopeLocked.value && query.value.memberId) {
+      payload.memberId = query.value.memberId
+    }
+    const res = await askRecord(payload)
+    askAnswer.value = res.answer || ''
+    applyAskQuery(res.query)
+    const pageWrap = res.page || {}
+    const page = pageWrap.page || {}
+    list.value = page.list || []
+    total.value = page.total || 0
+    sumIncome.value = pageWrap.sumIncome || 0
+    sumExpense.value = pageWrap.sumExpense || 0
+  } finally {
+    asking.value = false
+  }
+}
+
+function applyAskQuery(q) {
+  if (!q) return
+  query.value.type = q.type ?? null
+  if (!scopeLocked.value) {
+    query.value.memberId = q.memberId ?? null
+  }
+  query.value.keyword = q.keyword || ''
+  query.value.payMethod = q.payMethod ?? null
+  query.value.area = q.area ?? null
+  query.value.isGift = q.isGift ?? null
+  query.value.minAmount = q.minAmount != null ? Number(q.minAmount) : null
+  query.value.maxAmount = q.maxAmount != null ? Number(q.maxAmount) : null
+  query.value.pageNum = 1
+  query.value.categoryId = q.categoryId ?? null
+  if (q.startDate && q.endDate) {
+    dateRange.value = [String(q.startDate).slice(0, 10), String(q.endDate).slice(0, 10)]
+  } else if (q.startDate) {
+    dateRange.value = [String(q.startDate).slice(0, 10), String(q.startDate).slice(0, 10)]
+  } else {
+    dateRange.value = []
+  }
+  queryCategory.value = q.categoryId ? buildPath(q.categoryId) : []
 }
 
 function openAdd() {
   form.value = emptyForm()
   dialog.value = true
+}
+
+function goImport() {
+  router.push('/import')
 }
 
 function openEdit(row) {
@@ -461,6 +541,7 @@ function openEdit(row) {
     area: row.area,
     payMethod: row.payMethod,
     isGift: row.isGift,
+    orderNo: row.orderNo,
     remark: row.remark
   }
   dialog.value = true
@@ -528,6 +609,22 @@ async function onDelete(row) {
 </script>
 
 <style scoped>
+.ask-box {
+  margin-bottom: 14px;
+}
+.ask-answer {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f2faf6;
+  border-radius: 4px;
+  color: var(--gjp-text);
+  line-height: 1.7;
+  font-size: 13px;
+}
+.ask-hint {
+  margin-top: 6px;
+  font-size: 12px;
+}
 .btns {
   padding-left: 72px;
 }

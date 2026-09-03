@@ -18,8 +18,39 @@ public class DifyProperties {
     private String categoriesVar = "categories";
     private int timeoutSeconds = 180;
 
+    /** 智能分析工作流。不要复用 apiKey（那是账单导入）。 */
+    private String analysisApiKey = "";
+    /** 为空时回落到 {@link #baseUrl}（即 DIFY_BASE_URL）。 */
+    private String analysisBaseUrl = "";
+    private int analysisTimeoutSeconds = 60;
+
+    /** 账单搜索工作流。 */
+    private String searchApiKey = "";
+    private String searchBaseUrl = "";
+    private int searchTimeoutSeconds = 60;
+
     public boolean configured() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public boolean analysisConfigured() {
+        return analysisApiKey != null && !analysisApiKey.isBlank();
+    }
+
+    public boolean searchConfigured() {
+        return searchApiKey != null && !searchApiKey.isBlank();
+    }
+
+    public String analysisBaseUrlOrDefault() {
+        return blankToDefault(analysisBaseUrl, baseUrl);
+    }
+
+    public String searchBaseUrlOrDefault() {
+        return blankToDefault(searchBaseUrl, baseUrl);
+    }
+
+    private static String blankToDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     public boolean workflowMode() {
@@ -88,5 +119,53 @@ public class DifyProperties {
 
     public void setTimeoutSeconds(int timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
+    }
+
+    public String getAnalysisApiKey() {
+        return analysisApiKey;
+    }
+
+    public void setAnalysisApiKey(String analysisApiKey) {
+        this.analysisApiKey = analysisApiKey;
+    }
+
+    public String getAnalysisBaseUrl() {
+        return analysisBaseUrl;
+    }
+
+    public void setAnalysisBaseUrl(String analysisBaseUrl) {
+        this.analysisBaseUrl = analysisBaseUrl;
+    }
+
+    public int getAnalysisTimeoutSeconds() {
+        return analysisTimeoutSeconds;
+    }
+
+    public void setAnalysisTimeoutSeconds(int analysisTimeoutSeconds) {
+        this.analysisTimeoutSeconds = analysisTimeoutSeconds;
+    }
+
+    public String getSearchApiKey() {
+        return searchApiKey;
+    }
+
+    public void setSearchApiKey(String searchApiKey) {
+        this.searchApiKey = searchApiKey;
+    }
+
+    public String getSearchBaseUrl() {
+        return searchBaseUrl;
+    }
+
+    public void setSearchBaseUrl(String searchBaseUrl) {
+        this.searchBaseUrl = searchBaseUrl;
+    }
+
+    public int getSearchTimeoutSeconds() {
+        return searchTimeoutSeconds;
+    }
+
+    public void setSearchTimeoutSeconds(int searchTimeoutSeconds) {
+        this.searchTimeoutSeconds = searchTimeoutSeconds;
     }
 }

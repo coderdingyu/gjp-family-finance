@@ -38,7 +38,9 @@ public interface UserMapper {
     @Update("UPDATE t_user SET password = #{password} WHERE id = #{id}")
     int updatePassword(@Param("id") Long id, @Param("password") String password);
 
-    @Update("UPDATE t_user SET status = #{status} WHERE id = #{id}")
+    @Update("UPDATE t_user SET status = #{status}, "
+            + "session_version = CASE WHEN #{status} = 0 THEN IFNULL(session_version, 0) + 1 "
+            + "ELSE IFNULL(session_version, 0) END WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 
     /** 本家庭的账号列表，户主管理成员账号用 */

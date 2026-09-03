@@ -188,8 +188,7 @@ public final class ExcelTextExtractor {
         List<Integer> keep = new ArrayList<>();
         for (int i = 0; i < headers.length; i++) {
             String h = compact(headers[i]);
-            if (h.contains("交易单号") || h.contains("商户单号") || h.equals("单号")
-                    || h.contains("订单号") || h.contains("流水号")) {
+            if (h.contains("对方账号") || h.equals("账号")) {
                 continue;
             }
             keep.add(i);

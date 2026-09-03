@@ -12,10 +12,10 @@ import java.util.List;
 public interface ImportItemMapper {
 
     @Insert("INSERT INTO t_import_item (job_id, file_id, family_id, status, reject_reason, type, "
-            + "category_name, category_id, amount, record_date, merchant, area, pay_method, is_gift, remark) "
+            + "category_name, category_id, amount, record_date, merchant, area, pay_method, is_gift, remark, order_no) "
             + "VALUES (#{jobId}, #{fileId}, #{familyId}, #{status}, #{rejectReason}, #{type}, "
             + "#{categoryName}, #{categoryId}, #{amount}, #{recordDate}, #{merchant}, #{area}, "
-            + "#{payMethod}, #{isGift}, #{remark})")
+            + "#{payMethod}, #{isGift}, #{remark}, #{orderNo})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(ImportItem item);
 

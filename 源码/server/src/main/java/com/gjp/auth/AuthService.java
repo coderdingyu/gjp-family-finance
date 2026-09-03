@@ -125,6 +125,7 @@ public class AuthService {
         login.setMemberId(user.getMemberId());
         login.setMemberName(memberName);
         login.setRole(user.getRole() == null ? Role.MEMBER : user.getRole());
+        login.setSessionVersion(user.getSessionVersion() == null ? 0 : user.getSessionVersion());
         return login;
     }
 }

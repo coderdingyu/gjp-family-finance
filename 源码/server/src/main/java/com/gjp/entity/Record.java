@@ -45,6 +45,9 @@ public class Record {
     /** 备注 */
     private String remark;
 
+    /** 订单号/商单号/交易单号，可空；同家庭相同订单号视为强重复 */
+    private String orderNo;
+
     /** 创建时间 */
     private LocalDateTime createTime;
 
@@ -157,6 +160,14 @@ public class Record {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public String getOrderNo() {
+        return orderNo;
+    }
+
+    public void setOrderNo(String orderNo) {
+        this.orderNo = orderNo;
     }
 
     public LocalDateTime getCreateTime() {

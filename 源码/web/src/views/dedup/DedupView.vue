@@ -62,7 +62,7 @@
 
     <div v-for="(g, gi) in result.groups" :key="gi" class="page-card group">
       <div class="group-head">
-        <el-tag :type="g.matchType === '完全一致' ? 'danger' : 'warning'" effect="dark" size="small">
+        <el-tag :type="g.matchType === '完全一致' || g.matchType === '订单号相同' ? 'danger' : 'warning'" effect="dark" size="small">
           {{ g.matchType }}
         </el-tag>
         <span class="group-amount">¥{{ money(g.amount) }} × {{ g.count }} 笔</span>
@@ -93,6 +93,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="merchant" label="商家" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="orderNo" label="订单号" min-width="130" show-overflow-tooltip />
         <el-table-column prop="payMethod" label="支付方式" width="88" />
         <el-table-column prop="remark" label="备注" min-width="110" show-overflow-tooltip />
         <el-table-column label="操作" width="80" align="center">

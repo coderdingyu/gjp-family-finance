@@ -90,4 +90,13 @@ public class StatController {
     public Result<Map<String, Object>> dashboard(@ModelAttribute StatQuery q) {
         return Result.ok(statService.dashboard(q.range(), q.getMemberId()));
     }
+
+    /**
+     * 个人看板。忽略请求里的 memberId，始终统计当前登录人自己。
+     * 本周 = 周一至周日（Asia/Shanghai），合计截到今天。
+     */
+    @GetMapping("/personal")
+    public Result<Map<String, Object>> personal() {
+        return Result.ok(statService.personal());
+    }
 }

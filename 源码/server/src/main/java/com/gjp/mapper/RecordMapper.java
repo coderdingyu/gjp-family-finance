@@ -43,7 +43,8 @@ public interface RecordMapper {
             + " <if test='q.minAmount != null'> AND r.amount <![CDATA[>=]]> #{q.minAmount} </if>"
             + " <if test='q.maxAmount != null'> AND r.amount <![CDATA[<=]]> #{q.maxAmount} </if>"
             + " <if test='q.keyword != null and q.keyword != \"\"'> AND (r.merchant LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\' "
-            + "     OR r.remark LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\') </if>"
+            + "     OR r.remark LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\' "
+            + "     OR r.order_no LIKE CONCAT('%', #{q.keyword}, '%') ESCAPE '\\\\') </if>"
             + " </where> ";
 
     @Select("<script>"
@@ -78,15 +79,15 @@ public interface RecordMapper {
     Record selectById(@Param("id") Long id, @Param("familyId") Long familyId);
 
     @Insert("INSERT INTO t_record (family_id, member_id, category_id, type, amount, record_date, "
-            + "merchant, area, pay_method, is_gift, remark) "
+            + "merchant, area, pay_method, is_gift, remark, order_no) "
             + "VALUES (#{familyId}, #{memberId}, #{categoryId}, #{type}, #{amount}, #{recordDate}, "
-            + "#{merchant}, #{area}, #{payMethod}, #{isGift}, #{remark})")
+            + "#{merchant}, #{area}, #{payMethod}, #{isGift}, #{remark}, #{orderNo})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Record record);
 
     @Update("UPDATE t_record SET member_id = #{memberId}, category_id = #{categoryId}, type = #{type}, "
             + "amount = #{amount}, record_date = #{recordDate}, merchant = #{merchant}, area = #{area}, "
-            + "pay_method = #{payMethod}, is_gift = #{isGift}, remark = #{remark} "
+            + "pay_method = #{payMethod}, is_gift = #{isGift}, remark = #{remark}, order_no = #{orderNo} "
             + "WHERE id = #{id} AND family_id = #{familyId}")
     int update(Record record);
 
@@ -108,4 +109,12 @@ public interface RecordMapper {
             + "GROUP BY record_date, type, amount, IFNULL(merchant, '')")
     List<Map<String, Object>> countImportFingerprints(@Param("familyId") Long familyId,
                                                       @Param("memberId") Long memberId);
+
+    /** 账本已有非空订单号次数（忽略大小写），导入强查重用 */
+    @Select("SELECT LOWER(TRIM(order_no)) AS orderNo, COUNT(*) AS cnt "
+            + "FROM t_record WHERE family_id = #{familyId} AND member_id = #{memberId} "
+            + "AND order_no IS NOT NULL AND TRIM(order_no) <> '' "
+            + "GROUP BY LOWER(TRIM(order_no))")
+    List<Map<String, Object>> countImportOrderNos(@Param("familyId") Long familyId,
+                                                  @Param("memberId") Long memberId);
 }

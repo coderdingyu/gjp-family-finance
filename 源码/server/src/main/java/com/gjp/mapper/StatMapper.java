@@ -202,4 +202,16 @@ public interface StatMapper {
 
     @Select("SELECT MAX(record_date) FROM t_record WHERE family_id = #{familyId}")
     LocalDate selectMaxDate(@Param("familyId") Long familyId);
+
+    /** 按日汇总收入与支出。ym 字段实际是 yyyy-MM-dd */
+    @Select("<script>SELECT DATE_FORMAT(r.record_date, '%Y-%m-%d') AS ym, "
+            + "       COALESCE(SUM(CASE WHEN r.type = 1 THEN r.amount ELSE 0 END), 0) AS income, "
+            + "       COALESCE(SUM(CASE WHEN r.type = 2 THEN r.amount ELSE 0 END), 0) AS expense "
+            + "FROM t_record r WHERE r.family_id = #{familyId} "
+            + "AND r.record_date BETWEEN #{startDate} AND #{endDate} " + MEMBER_COND
+            + " GROUP BY DATE_FORMAT(r.record_date, '%Y-%m-%d') ORDER BY ym</script>")
+    List<MonthAmount> selectDailyTrend(@Param("familyId") Long familyId,
+                                       @Param("startDate") LocalDate startDate,
+                                       @Param("endDate") LocalDate endDate,
+                                       @Param("memberId") Long memberId);
 }

@@ -204,6 +204,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="merchant" label="商家" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
         <el-table-column prop="area" label="片区" width="80" />
         <el-table-column prop="payMethod" label="支付" width="80" />
         <el-table-column prop="sourceName" label="来源文件" min-width="140" show-overflow-tooltip />

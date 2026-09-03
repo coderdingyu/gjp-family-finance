@@ -39,7 +39,7 @@ function unauthorized(message, config = {}) {
   clearUser()
   if (!authRedirecting) {
     authRedirecting = true
-    ElMessage.warning('登录已过期，请重新登录')
+    ElMessage.warning(message || '登录已过期，请重新登录')
     window.location.replace('/login')
   }
   return Promise.reject(error)

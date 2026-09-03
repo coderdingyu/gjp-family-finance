@@ -1,0 +1,173 @@
+app:
+  description: 把自然语言问题收成流水查询条件，并给一句中文回答。不写库。
+  icon: 📊
+  icon_background: '#E8F5E9'
+  icon_type: emoji
+  mode: workflow
+  name: 管家婆账单搜索
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods:
+      - local_file
+      number_limits: 1
+      image:
+        enabled: false
+        number_limits: 1
+        transfer_methods:
+        - local_file
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: start-to-llm
+      source: '1788420000001'
+      sourceHandle: source
+      target: '1788420000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: llm-to-end
+      source: '1788420000002'
+      sourceHandle: source
+      target: '1788420000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 入口
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - label: 用户问题
+          max_length: 4000
+          required: true
+          type: paragraph
+          variable: question
+        - label: 权限内快照
+          max_length: 80000
+          required: true
+          type: paragraph
+          variable: snapshot
+        - label: 今天
+          max_length: 16
+          required: false
+          type: text-input
+          variable: today
+      height: 160
+      id: '1788420000001'
+      position:
+        x: 80
+        y: 240
+      positionAbsolute:
+        x: 80
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: 只输出 JSON
+        memory: null
+        model:
+          completion_params:
+            temperature: 0.6
+            enable_thinking: false
+          mode: chat
+          name: qwen3.8-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - role: system
+          text: "你是「管家婆」家庭收支管理系统的账单搜索助手。\n你只能根据 snapshot 解释用户问题，生成结构化查询，并给一句中文回答。\n不要访问数据库，不要输出 Markdown。\n只输出一个 JSON 对象：\n{\n  \"answer\": \"一句话中文回答\",\n  \"query\": {\n    \"type\": null,\n    \"memberId\": null,\n    \"categoryId\": null,\n    \"categoryName\": null,\n    \"startDate\": null,\n    \"endDate\": null,\n    \"keyword\": null,\n    \"payMethod\": null,\n    \"area\": null,\n    \"isGift\": null,\n    \"minAmount\": null,\n    \"maxAmount\": null\n  }\n}\n规则：\n1. type 只能是 1=收入、2=支出，不确定则 null。\n2. 日期用 YYYY-MM-DD。相对日期按 today 计算：上个月、本月、今年。\n3. payMethod 只能是 现金/微信/支付宝/银行卡/其他。\n4. isGift：问人情/礼金/红包时为 1。\n5. memberId 只能来自 snapshot.members；snapshot.scope 为 member 时必须保持该成员，禁止改成别人。\n6. categoryId / categoryName 只能来自 snapshot.categories。\n7. keyword 用于商家或备注，不要把分类名再塞进去。\n8. 回答必须基于 snapshot 里已有的记录或合计，不要编造金额。\n9. 若问题要看 snapshot 里没有的成员或家庭，明确说只能查当前权限内的账，query.memberId 不要填外人。"
+        - role: user
+          text: "今天：{{#1788420000001.today#}}\n\n用户问题：\n{{#1788420000001.question#}}\n\n权限内快照（JSON）：\n{{#1788420000001.snapshot#}}\n\n只输出 JSON。"
+        selected: false
+        title: 生成
+        type: llm
+        vision:
+          configs:
+            variable_selector: []
+          enabled: false
+      height: 90
+      id: '1788420000002'
+      position:
+        x: 400
+        y: 240
+      positionAbsolute:
+        x: 400
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        desc: 输出 JSON
+        outputs:
+        - value_selector:
+          - '1788420000002'
+          - text
+          variable: result
+        selected: false
+        title: 结束
+        type: end
+      height: 116
+      id: '1788420000003'
+      position:
+        x: 720
+        y: 240
+      positionAbsolute:
+        x: 720
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8
+  rag_pipeline_variables: []

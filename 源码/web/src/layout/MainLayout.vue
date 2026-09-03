@@ -18,6 +18,9 @@
           <el-menu-item index="/home">
             <el-icon><DataBoard /></el-icon><span>家庭看板</span>
           </el-menu-item>
+          <el-menu-item index="/me">
+            <el-icon><Avatar /></el-icon><span>个人看板</span>
+          </el-menu-item>
           <el-menu-item index="/record">
             <el-icon><Tickets /></el-icon><span>收支流水</span>
           </el-menu-item>
@@ -112,7 +115,7 @@ import { resetTabIdentity } from '../utils/authSession'
 const route = useRoute()
 
 const user = currentUser
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => (route.path === '/personal' ? '/me' : route.path))
 
 const roleTagType = computed(() => {
   if (user.value.role === ROLE.ADMIN) return 'danger'

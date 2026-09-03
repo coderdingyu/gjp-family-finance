@@ -29,6 +29,13 @@ const routes = [
         meta: { title: '家庭看板', roles: [ROLE.MEMBER, ROLE.OWNER] }
       },
       {
+        path: 'me',
+        name: 'me',
+        alias: '/personal',
+        component: () => import('../views/me/PersonalView.vue'),
+        meta: { title: '个人看板', roles: [ROLE.MEMBER, ROLE.OWNER] }
+      },
+      {
         path: 'record',
         name: 'record',
         component: () => import('../views/record/RecordView.vue'),

@@ -8,6 +8,7 @@ import com.gjp.mapper.RecordMapper;
 import com.gjp.record.RecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,10 +63,17 @@ public class DedupService {
 
         List<Map<String, Object>> pairs = dedupMapper.findPairs(
                 familyId, memberId, tol, byMember, byCategory, startDate, endDate);
+        List<Map<String, Object>> orderPairs = dedupMapper.findOrderNoPairs(
+                familyId, memberId, byMember, startDate, endDate);
 
         // ---- 并查集：把配对合并成组 ----
         Map<Long, Long> parent = new HashMap<>();
         for (Map<String, Object> pair : pairs) {
+            Long a = ((Number) pair.get("idA")).longValue();
+            Long b = ((Number) pair.get("idB")).longValue();
+            union(parent, a, b);
+        }
+        for (Map<String, Object> pair : orderPairs) {
             Long a = ((Number) pair.get("idA")).longValue();
             Long b = ((Number) pair.get("idB")).longValue();
             union(parent, a, b);
@@ -108,8 +116,9 @@ public class DedupService {
             g.setAmount(records.get(0).getAmount());
             g.setCount(records.size());
             g.setMaxDayDiff(maxDiff);
-            g.setMatchType(maxDiff == 0 ? "完全一致" : "高度相似");
-            g.setReason(buildReason(records, maxDiff));
+            boolean orderDup = allSameOrderNo(records);
+            g.setMatchType(orderDup ? "订单号相同" : (maxDiff == 0 ? "完全一致" : "高度相似"));
+            g.setReason(buildReason(records, maxDiff, orderDup));
             // 建议保留最早录入的那条（ID 最小），其余交给用户判断
             g.setSuggestKeepId(records.stream().min(Comparator.comparing(Record::getId))
                     .map(Record::getId).orElse(null));
@@ -127,9 +136,13 @@ public class DedupService {
         BigDecimal wasted = BigDecimal.ZERO;
         int extraCount = 0;
         for (DuplicateGroup g : groups) {
-            // 假设每组只保留一条，多出来的金额就是被重复计入统计的部分
             extraCount += g.getCount() - 1;
-            wasted = wasted.add(g.getAmount().multiply(BigDecimal.valueOf(g.getCount() - 1L)));
+            Long keepId = g.getSuggestKeepId();
+            for (Record r : g.getRecords()) {
+                if (r.getAmount() != null && (keepId == null || !keepId.equals(r.getId()))) {
+                    wasted = wasted.add(r.getAmount());
+                }
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -142,9 +155,31 @@ public class DedupService {
         return result;
     }
 
-    private String buildReason(List<Record> records, int maxDiff) {
+    static boolean allSameOrderNo(List<Record> records) {
+        String first = null;
+        for (Record r : records) {
+            String n = OrderNos.normalize(r.getOrderNo());
+            if (n == null) {
+                return false;
+            }
+            if (first == null) {
+                first = n;
+            } else if (!first.equalsIgnoreCase(n)) {
+                return false;
+            }
+        }
+        return first != null && records.size() >= 2;
+    }
+
+    private String buildReason(List<Record> records, int maxDiff, boolean orderDup) {
         Record first = records.get(0);
         StringBuilder sb = new StringBuilder();
+        if (orderDup) {
+            sb.append(records.size()).append(" 笔订单号均为「")
+                    .append(OrderNos.normalize(first.getOrderNo())).append("」");
+            sb.append("，即使金额或日期不完全相同，也视为同一笔交易被重复录入。");
+            return sb.toString();
+        }
         sb.append(records.size()).append(" 笔金额均为 ").append(first.getAmount()).append(" 元的")
                 .append(first.getType() != null && first.getType() == 1 ? "收入" : "支出");
         if (maxDiff == 0) {
@@ -165,6 +200,7 @@ public class DedupService {
     }
 
     /** 用户确认后删除选中的流水；复用流水模块的批量删除以保证权限校验与日志一致 */
+    @Transactional(rollbackFor = Exception.class)
     public int deleteSelected(List<Long> ids) {
         return recordService.deleteBatch(ids);
     }

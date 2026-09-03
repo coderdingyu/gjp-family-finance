@@ -6,6 +6,12 @@
         <span class="text-light">
           基于客观数据给出结论、依据与建议 —— 回答"钱为什么多花了"，而不只是"花了多少"
         </span>
+        <el-tag v-if="agentConfigured" type="success" size="small" effect="plain" style="margin-left: 8px">
+          智能体已接入：规则判定阈值，工作流润色并给出总判断
+        </el-tag>
+        <el-tag v-else type="info" size="small" effect="plain" style="margin-left: 8px">
+          当前为本机规则文案
+        </el-tag>
       </div>
       <div class="tools">
         <MemberScope v-model="memberId" @change="load" />
@@ -33,10 +39,11 @@
 
       <el-empty v-if="!items.length" description="所选区间内没有可分析的数据" />
 
-      <div v-for="item in items" :key="item.code + item.title" class="item" :class="item.level">
+      <div v-for="item in items" :key="item.code + item.title" class="item" :class="[item.level, { verdict: isS0(item) }]">
         <div class="item-head">
           <el-icon :size="17"><component :is="iconOf(item.level)" /></el-icon>
           <span class="title">{{ item.title }}</span>
+          <el-tag v-if="isS0(item)" size="small" type="danger" effect="dark">总判断</el-tag>
           <el-tag size="small" effect="plain" class="code">{{ item.code }}</el-tag>
         </div>
         <div class="row">
@@ -60,6 +67,8 @@
       <p class="text-light" style="margin-top: 10px; line-height: 1.8">
         说明：以上阈值定义在后端 AnalysisService 的常量中，可根据家庭实际情况调整；
         每条结论都同时给出参与计算的原始数字，便于核对，也便于测试用例逐条验证。
+        配置 DIFY_ANALYSIS_API_KEY 后，命中规则仍由 Java 判定；智能体润色 A* 文案，并追加 S0 总判断（以及可选的 S1/S2）。
+        失败时自动回退本机 A* 文案。
       </p>
     </div>
   </div>
@@ -69,13 +78,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { CircleCheck, InfoFilled, Refresh, WarningFilled } from '@element-plus/icons-vue'
 import MemberScope from '../../components/MemberScope.vue'
-import { analysisReport } from '../../api/analysis'
+import { analysisConfig, analysisReport } from '../../api/analysis'
 import { toDateStr } from '../../utils/format'
 
 const loading = ref(false)
 const items = ref([])
 const range = ref(defaultRange())
 const memberId = ref(null)
+const agentConfigured = ref(false)
 
 function defaultRange() {
   const y = new Date().getFullYear()
@@ -89,11 +99,19 @@ const rules = [
   { code: 'A4', name: '成员预算预警', logic: '扫描区间内每个完整月的预算执行，使用率 > 100% 判定超支，≥ 80% 判定接近上限；同一成员多月超支合并为一条' },
   { code: 'A5', name: '支出结构集中度', logic: '占比最高的一级分类超过总支出 50% 时提示结构单一，并列出前三分类' },
   { code: 'A6', name: '商家消费集中度', logic: '单一商家占已填写商家消费的 20% 以上时提示消费集中；房租房贷月供不计入商家榜' },
-  { code: 'A7', name: '片区消费分布', logic: '单一片区占比达 40% 以上时提示区域集中，反映家庭生活半径' },
+  { code: 'A7', name: '片区消费分布', logic: '片区是课纲要求的可选维度，填写不规范时结论参考即可。单一片区占比达 40% 以上时可提示区域集中' },
   { code: 'A8', name: '人情往来专项', logic: '标记为人情往来的支出占总支出 10% 以上时提示占比偏高' }
 ]
 
-onMounted(load)
+onMounted(async () => {
+  try {
+    const cfg = await analysisConfig()
+    agentConfigured.value = !!cfg?.configured
+  } catch (e) {
+    agentConfigured.value = false
+  }
+  await load()
+})
 
 async function load() {
   if (!range.value || range.value.length !== 2) return
@@ -117,6 +135,10 @@ function iconOf(level) {
   if (level === 'danger' || level === 'warning') return WarningFilled
   if (level === 'good') return CircleCheck
   return InfoFilled
+}
+
+function isS0(item) {
+  return item?.code === 'S0'
 }
 </script>
 
@@ -195,6 +217,15 @@ function iconOf(level) {
 
 .item.good .item-head {
   color: #1c8f63;
+}
+
+.item.verdict {
+  border-left-width: 6px;
+  box-shadow: 0 2px 10px rgba(46, 125, 91, 0.14);
+}
+
+.item.verdict .title {
+  font-size: 16px;
 }
 
 .item-head .title {

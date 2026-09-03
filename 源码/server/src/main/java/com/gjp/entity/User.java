@@ -31,6 +31,9 @@ public class User {
     /** 状态：1=正常 0=已禁用 */
     private Integer status;
 
+    /** 登录会话版本。禁用时加一，拦截器用它踢掉所有已登录槽位 */
+    private Integer sessionVersion;
+
     /** 最后登录时间 */
     private LocalDateTime lastLogin;
 
@@ -105,6 +108,14 @@ public class User {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getSessionVersion() {
+        return sessionVersion;
+    }
+
+    public void setSessionVersion(Integer sessionVersion) {
+        this.sessionVersion = sessionVersion;
     }
 
     public LocalDateTime getLastLogin() {

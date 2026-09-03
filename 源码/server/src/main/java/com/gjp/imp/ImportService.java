@@ -627,6 +627,7 @@ public class ImportService {
         item.setArea(trimTo(str(raw.get("area")), 50));
         item.setPayMethod(normalizePay(str(raw.get("payMethod"))));
         item.setIsGift(toGift(raw.get("isGift")));
+        item.setOrderNo(trimTo(firstOrderNo(raw), 64));
 
         if (item.getAmount() == null || item.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             item.setStatus("skipped");
@@ -656,6 +657,7 @@ public class ImportService {
         record.setPayMethod(item.getPayMethod());
         record.setIsGift(item.getIsGift() == null ? 0 : item.getIsGift());
         record.setRemark(item.getRemark());
+        record.setOrderNo(item.getOrderNo());
         return record;
     }
 
@@ -898,6 +900,16 @@ public class ImportService {
 
     private static String str(Object v) {
         return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    private static String firstOrderNo(Map<String, Object> raw) {
+        for (String key : new String[] {"orderNo", "order_no", "商单号", "订单号", "交易单号", "交易订单号", "商家订单号", "商户单号"}) {
+            String v = str(raw.get(key));
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return null;
     }
 
     private static String trimTo(String s, int max) {
