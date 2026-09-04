@@ -127,11 +127,14 @@ async function onRegister() {
   align-items: center;
   justify-content: center;
   gap: 80px;
-  background: linear-gradient(135deg, #233a30 0%, #2e7d5b 100%);
+  background:
+    radial-gradient(1000px 520px at 15% 10%, #e0e7ff 0%, transparent 55%),
+    radial-gradient(800px 480px at 90% 90%, #fce7f3 0%, transparent 50%),
+    var(--gjp-bg);
 }
 
 .brand {
-  color: #fff;
+  color: var(--gjp-text);
   max-width: 420px;
 }
 
@@ -139,11 +142,12 @@ async function onRegister() {
   font-size: 44px;
   margin: 0;
   letter-spacing: 6px;
+  color: var(--gjp-primary);
 }
 
 .brand p {
   font-size: 18px;
-  opacity: 0.85;
+  color: #64748b;
   margin: 8px 0 26px;
   letter-spacing: 2px;
 }
@@ -151,13 +155,14 @@ async function onRegister() {
 .brand ul {
   padding-left: 20px;
   line-height: 2.1;
-  opacity: 0.8;
+  color: #64748b;
   font-size: 14px;
 }
 
 .login-card {
   width: 380px;
-  border-radius: 8px;
+  border-radius: var(--gjp-radius);
+  border: none;
 }
 
 .submit {

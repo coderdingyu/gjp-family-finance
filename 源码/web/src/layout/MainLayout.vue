@@ -1,16 +1,15 @@
 <template>
   <el-container class="layout">
-    <el-aside width="210px" class="aside">
+    <el-aside width="220px" class="aside">
       <div class="logo">
-        <el-icon :size="22"><Wallet /></el-icon>
+        <span class="logo-badge">
+          <el-icon :size="18"><Wallet /></el-icon>
+        </span>
         <span>管家婆</span>
       </div>
       <el-menu
         :default-active="activeMenu"
         class="menu"
-        background-color="#233a30"
-        text-color="#c8d6cf"
-        active-text-color="#ffffff"
         router
       >
         <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债 -->
@@ -56,7 +55,7 @@
       </el-menu>
     </el-aside>
 
-    <el-container>
+    <el-container class="workspace" direction="vertical">
       <el-header class="header">
         <div class="crumb">
           <span class="family">{{ user.familyName }}</span>
@@ -69,19 +68,17 @@
             <el-icon><Lock /></el-icon>
             仅显示我（{{ user.memberName || user.realName }}）的数据
           </el-tag>
-          <el-tag v-else-if="isOwner" type="success" size="small" effect="plain" class="scope-tag">
+          <el-tag v-else-if="isOwner" size="small" effect="plain" class="scope-tag">
             <el-icon><View /></el-icon>
             户主视角 · 可查看全家数据
           </el-tag>
 
           <el-dropdown @command="onCommand">
-            <span class="user-name">
+            <span class="user-chip">
               <el-icon><UserFilled /></el-icon>
               {{ user.realName || user.username }}
-              <el-tag size="small" :type="roleTagType" effect="dark" class="role-tag">
-                {{ user.roleName }}
-              </el-tag>
-              <el-icon><ArrowDown /></el-icon>
+              <span class="role-pill" :class="rolePillClass">{{ user.roleName }}</span>
+              <el-icon class="chevron"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -117,10 +114,10 @@ const route = useRoute()
 const user = currentUser
 const activeMenu = computed(() => (route.path === '/personal' ? '/me' : route.path))
 
-const roleTagType = computed(() => {
-  if (user.value.role === ROLE.ADMIN) return 'danger'
-  if (user.value.role === ROLE.OWNER) return 'success'
-  return 'info'
+const rolePillClass = computed(() => {
+  if (user.value.role === ROLE.ADMIN) return 'is-admin'
+  if (user.value.role === ROLE.OWNER) return 'is-owner'
+  return 'is-member'
 })
 
 function onCommand(cmd) {
@@ -158,37 +155,97 @@ async function logoutThisTab() {
 <style scoped>
 .layout {
   height: 100%;
+  background: var(--gjp-bg);
+  padding: 12px;
+  gap: 12px;
 }
 
 .aside {
-  background: #233a30;
+  background: var(--gjp-card);
+  border-radius: var(--gjp-radius);
+  box-shadow: var(--gjp-shadow);
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .logo {
-  height: 60px;
+  height: 56px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 20px;
-  color: #fff;
+  gap: 10px;
+  padding: 0 18px;
+  color: var(--gjp-text);
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: 2px;
-  background: #1c2f27;
+  letter-spacing: 1px;
+}
+
+.logo-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gjp-primary);
+  background: color-mix(in srgb, var(--gjp-primary) 12%, #fff);
 }
 
 .menu {
   border-right: none;
+  padding: 4px 12px 16px;
+  --el-menu-bg-color: transparent;
+  --el-menu-hover-bg-color: var(--gjp-primary-soft);
+  --el-menu-text-color: #4b5563;
+  --el-menu-active-color: #fff;
+  --el-menu-hover-text-color: var(--gjp-primary);
+}
+
+.menu :deep(.el-menu-item) {
+  height: 42px;
+  line-height: 42px;
+  margin: 4px 0;
+  border-radius: 16px;
+  color: #4b5563;
+}
+
+.menu :deep(.el-menu-item:hover) {
+  background: var(--gjp-primary-soft);
+  color: var(--gjp-primary);
+}
+
+.menu :deep(.el-menu-item.is-active) {
+  background: var(--gjp-primary) !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: var(--gjp-shadow-active);
+}
+
+.menu :deep(.el-menu-item.is-active:hover) {
+  background: var(--gjp-primary) !important;
+  color: #fff !important;
+}
+
+.menu :deep(.el-menu-item:focus-visible) {
+  outline: 2px solid var(--gjp-primary);
+  outline-offset: 2px;
+}
+
+.workspace {
+  min-width: 0;
+  background: transparent;
 }
 
 .header {
-  height: 60px;
-  background: #fff;
-  border-bottom: 1px solid var(--gjp-border);
+  height: 56px;
+  background: var(--gjp-card);
+  border-radius: var(--gjp-radius);
+  box-shadow: var(--gjp-shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 20px;
+  margin-bottom: 12px;
 }
 
 .crumb .family {
@@ -197,36 +254,70 @@ async function logoutThisTab() {
 }
 
 .crumb .page-name {
-  color: var(--gjp-text-light);
+  color: #64748b;
 }
 
 .user-area {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .scope-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  background: var(--gjp-primary-soft);
+  color: var(--gjp-primary);
+  border: none;
 }
 
-.user-name {
+.user-chip {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
   outline: none;
   color: var(--gjp-text);
+  padding: 4px 4px 4px 10px;
+  border-radius: var(--gjp-radius-pill);
+  transition: background 0.15s ease;
 }
 
-.role-tag {
+.user-chip:hover {
+  background: var(--gjp-primary-soft);
+  color: var(--gjp-primary);
+}
+
+.role-pill {
   margin-left: 2px;
+  padding: 2px 8px;
+  border-radius: var(--gjp-radius-pill);
+  font-size: 11px;
+  line-height: 16px;
+  color: #fff;
+}
+
+.role-pill.is-owner {
+  background: var(--gjp-primary);
+  box-shadow: var(--gjp-shadow-active);
+}
+
+.role-pill.is-admin {
+  background: var(--gjp-expense);
+}
+
+.role-pill.is-member {
+  background: #94a3b8;
+}
+
+.chevron {
+  color: var(--gjp-text-light);
 }
 
 .main {
-  padding: 16px;
+  padding: 0 2px 8px;
   overflow-y: auto;
+  background: transparent;
 }
 </style>

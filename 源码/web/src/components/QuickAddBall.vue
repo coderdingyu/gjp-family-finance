@@ -309,20 +309,20 @@ async function onSaveAndClose() {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2e7d5b, #21a675);
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
-  box-shadow: 0 4px 16px rgba(46, 125, 91, 0.4);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
   transition: transform 0.15s, box-shadow 0.15s;
   user-select: none;
 }
 
 .ball:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 22px rgba(46, 125, 91, 0.5);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.45);
 }
 
 .ball.dragging {
@@ -338,11 +338,11 @@ async function onSaveAndClose() {
   position: absolute;
   right: 64px;
   white-space: nowrap;
-  background: rgba(0, 0, 0, 0.72);
+  background: #4338ca;
   color: #fff;
   font-size: 12px;
-  padding: 4px 9px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
@@ -366,8 +366,8 @@ async function onSaveAndClose() {
 .panel {
   position: fixed;
   background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  border-radius: 1.5rem;
+  box-shadow: var(--gjp-shadow);
   padding: 16px 18px;
 }
 
@@ -385,18 +385,20 @@ async function onSaveAndClose() {
 
 .entry {
   flex: 1;
-  border: 1px solid var(--gjp-border);
-  border-radius: 8px;
+  border: none;
+  border-radius: 16px;
   padding: 14px 10px;
   text-align: center;
   cursor: pointer;
   transition: all 0.15s;
   color: var(--gjp-primary);
+  background: var(--gjp-primary-soft);
+  box-shadow: 0 4px 14px -6px rgba(148, 163, 184, 0.4);
 }
 
 .entry:hover {
-  border-color: var(--gjp-primary);
-  background: #f2faf6;
+  background: #e0e7ff;
+  box-shadow: var(--gjp-shadow-hover);
   transform: translateY(-2px);
 }
 
@@ -406,8 +408,8 @@ async function onSaveAndClose() {
 }
 
 .entry.disabled:hover {
-  border-color: var(--gjp-border);
-  background: #fafafa;
+  background: #f8fafc;
+  box-shadow: none;
   transform: none;
 }
 

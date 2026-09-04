@@ -75,7 +75,7 @@
                     :percentage="Number(row.ratio)"
                     :stroke-width="8"
                     :show-text="false"
-                    color="#2e7d5b"
+                    color="var(--gjp-primary)"
                   />
                   <span class="ratio-num">{{ row.ratio }}%</span>
                 </div>
@@ -148,7 +148,7 @@ import {
   subCategoryStat,
   trend
 } from '../../api/stat'
-import { CHART_COLORS, money, toDateStr } from '../../utils/format'
+import { CHART_COLORS, TONE, money, toDateStr } from '../../utils/format'
 
 const loading = ref(false)
 const type = ref(2)
@@ -240,7 +240,7 @@ function clearDrill() {
 const trendOption = computed(() => {
   const key = type.value === 1 ? 'income' : 'expense'
   return {
-    color: [type.value === 1 ? '#21a675' : '#d9534f'],
+    color: [type.value === 1 ? TONE.income : TONE.expense],
     tooltip: { trigger: 'axis', valueFormatter: (v) => `¥${money(v)}` },
     grid: { left: 62, right: 24, top: 24, bottom: 30 },
     xAxis: { type: 'category', data: trendRows.value.map((r) => r.ym), boundaryGap: false },
@@ -297,7 +297,7 @@ const catPieOption = computed(() => {
 })
 
 const memberOption = computed(() => ({
-  color: [type.value === 1 ? '#21a675' : '#2e7d5b'],
+  color: [type.value === 1 ? TONE.income : TONE.primary],
   tooltip: {
     trigger: 'axis',
     axisPointer: { type: 'shadow' },

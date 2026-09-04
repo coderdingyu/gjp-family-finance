@@ -3,20 +3,20 @@
     <!-- 运行状态 -->
     <el-row :gutter="14" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="内存占用" :value="`${rt.memoryUsedMb ?? '-'} MB`" prefix="" raw color="#409eff"
+        <StatCard label="内存占用" :value="`${rt.memoryUsedMb ?? '-'} MB`" prefix="" raw color="var(--gjp-count)"
                   :sub="`共 ${rt.memoryMaxMb} MB · 使用率 ${rt.memoryUsedRate}%`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="已运行" :value="rt.uptime" prefix="" raw color="#2e7d5b"
+        <StatCard label="已运行" :value="rt.uptime" prefix="" raw color="var(--gjp-income)"
                   :sub="`启动于 ${rt.startTime}`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="操作日志" :value="scale.logCount" prefix="" raw color="#e6a23c"
+        <StatCard label="操作日志" :value="scale.logCount" prefix="" raw color="var(--gjp-balance)"
                   :sub="`失败 ${health.failedCount} 条 · 失败率 ${health.failRate}%`" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard label="运行状态" :value="health.status" prefix="" raw
-                  :color="health.status === '正常' ? '#21a675' : '#d9534f'"
+                  :color="health.status === '正常' ? 'var(--gjp-income)' : 'var(--gjp-expense)'"
                   :sub="`${scale.familyCount} 个家庭 · ${scale.userCount} 个账号`" />
       </el-col>
     </el-row>
@@ -178,7 +178,7 @@ import {
   adminChangeOwnPassword, adminFamilies, adminOverview, adminResetPassword,
   adminToggleStatus, adminUsers
 } from '../../api/admin'
-import { CHART_COLORS } from '../../utils/format'
+import { CHART_COLORS, TONE } from '../../utils/format'
 
 /**
  * 系统维护界面（需求第 8 条）。
@@ -249,7 +249,7 @@ function roleTag(role) {
 const dayOption = computed(() => {
   const rows = overview.value.logByDay || []
   return {
-    color: ['#2e7d5b'],
+    color: [TONE.primary],
     tooltip: { trigger: 'axis' },
     grid: { left: 46, right: 24, top: 20, bottom: 30 },
     xAxis: { type: 'category', data: rows.map((r) => r.name) },

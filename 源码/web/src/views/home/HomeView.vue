@@ -36,28 +36,28 @@
     </div>
 
     <!-- 指标卡 -->
-    <el-row :gutter="14" class="cards">
+    <el-row :gutter="16" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="收入合计" :value="ov.totalIncome" color="#21a675"
+        <StatCard label="收入合计" :value="ov.totalIncome" :color="TONE.income" icon="↑"
                   :sub="`月均 ¥${money(ov.avgMonthlyIncome)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="支出合计" :value="ov.totalExpense" color="#d9534f"
+        <StatCard label="支出合计" :value="ov.totalExpense" :color="TONE.expense" icon="↓"
                   :sub="`月均 ¥${money(ov.avgMonthlyExpense)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard :label="data.memberId ? '本人结余' : '家庭结余'" :value="ov.balance"
-                  :color="Number(ov.balance) >= 0 ? '#2e7d5b' : '#d9534f'"
+                  :color="Number(ov.balance) >= 0 ? TONE.balance : TONE.expense" icon="≈"
                   :sub="`结余率 ${balanceRate}%`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="流水笔数" :value="ov.recordCount" color="#409eff" prefix="" raw
+        <StatCard label="流水笔数" :value="ov.recordCount" :color="TONE.count" icon="#" prefix="" raw
                   :sub="`单笔最大支出 ¥${money(ov.maxExpense)}`" />
       </el-col>
     </el-row>
 
     <!-- 趋势 + 支出结构 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="16">
         <div class="page-card">
           <h3 class="card-title">收支趋势</h3>
@@ -73,7 +73,7 @@
     </el-row>
 
     <!-- 成员 + 商家 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="12">
         <div class="page-card">
           <h3 class="card-title">
@@ -92,7 +92,7 @@
     </el-row>
 
     <!-- 片区 + 支付方式 + 预算 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="8">
         <div class="page-card">
           <h3 class="card-title">消费片区分布</h3>
@@ -138,7 +138,7 @@ import EChart from '../../components/EChart.vue'
 import MemberScope from '../../components/MemberScope.vue'
 import StatCard from '../../components/StatCard.vue'
 import { dashboard } from '../../api/stat'
-import { CHART_COLORS, currentMonth, currentYear, money } from '../../utils/format'
+import { CHART_COLORS, TONE, currentMonth, currentYear, money } from '../../utils/format'
 
 const loading = ref(false)
 const data = ref({})
@@ -195,15 +195,27 @@ function budgetTag(status) {
 const trendOption = computed(() => {
   const rows = data.value.trend || []
   return {
-    color: ['#21a675', '#d9534f', '#e6a23c'],
+    color: [TONE.income, TONE.expense, TONE.balance],
     tooltip: { trigger: 'axis', valueFormatter: (v) => `¥${money(v)}` },
     legend: { data: ['收入', '支出', '结余'], top: 0 },
     grid: { left: 60, right: 30, top: 40, bottom: 30 },
     xAxis: { type: 'category', data: rows.map((r) => r.ym), axisTick: { alignWithLabel: true } },
     yAxis: { type: 'value', axisLabel: { formatter: (v) => (v >= 10000 ? v / 10000 + '万' : v) } },
     series: [
-      { name: '收入', type: 'bar', barMaxWidth: 22, data: rows.map((r) => Number(r.income)) },
-      { name: '支出', type: 'bar', barMaxWidth: 22, data: rows.map((r) => Number(r.expense)) },
+      {
+        name: '收入',
+        type: 'bar',
+        barMaxWidth: 22,
+        itemStyle: { borderRadius: [10, 10, 4, 4] },
+        data: rows.map((r) => Number(r.income))
+      },
+      {
+        name: '支出',
+        type: 'bar',
+        barMaxWidth: 22,
+        itemStyle: { borderRadius: [10, 10, 4, 4] },
+        data: rows.map((r) => Number(r.expense))
+      },
       {
         name: '结余',
         type: 'line',
@@ -262,7 +274,7 @@ const payPieOption = computed(() => pieOption(data.value.payMethod || [], '支�
 const memberBarOption = computed(() => {
   const rows = data.value.memberExpense || []
   return {
-    color: ['#2e7d5b'],
+    color: [TONE.primary],
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v) => `¥${money(v)}` },
     grid: { left: 70, right: 110, top: 20, bottom: 30 },
     xAxis: { type: 'value', axisLabel: { formatter: (v) => (v >= 10000 ? v / 10000 + '万' : v) } },
@@ -271,6 +283,7 @@ const memberBarOption = computed(() => {
       {
         type: 'bar',
         barMaxWidth: 24,
+        itemStyle: { borderRadius: [0, 999, 999, 0] },
         label: { show: true, position: 'right', formatter: (p) => `¥${money(p.value)}` },
         data: rows.map((r) => Number(r.amount)).reverse()
       }
@@ -281,7 +294,7 @@ const memberBarOption = computed(() => {
 const merchantBarOption = computed(() => {
   const rows = data.value.merchantRank || []
   return {
-    color: ['#e6a23c'],
+    color: [TONE.expense],
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
@@ -297,7 +310,13 @@ const merchantBarOption = computed(() => {
       {
         type: 'bar',
         barMaxWidth: 20,
-        label: { show: true, position: 'right', formatter: (p) => `¥${money(p.value)}` },
+        itemStyle: { borderRadius: [0, 999, 999, 0] },
+        label: {
+          show: true,
+          position: 'right',
+          color: TONE.expense,
+          formatter: (p) => `¥${money(p.value)}`
+        },
         data: rows.map((r) => Number(r.amount)).reverse()
       }
     ]
@@ -325,6 +344,7 @@ const merchantBarOption = computed(() => {
 .card-title.inline {
   display: inline-block;
   margin: 0 12px 0 0;
+  font-size: 17px;
 }
 
 .cards {

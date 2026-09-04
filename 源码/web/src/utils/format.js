@@ -41,9 +41,18 @@ export function typeText(type) {
   return Number(type) === 1 ? '收入' : '支出'
 }
 
+/** Soft UI 语义色，给 ECharts 等无法读 CSS 变量的地方用 */
+export const TONE = {
+  primary: '#4f46e5',
+  income: '#10b981',
+  expense: '#ec4899',
+  balance: '#f59e0b',
+  count: '#4f46e5'
+}
+
 /** 图表统一配色：与全局 CSS 变量保持一致 */
 export const CHART_COLORS = [
-  '#2e7d5b', '#5b9c7d', '#e6a23c', '#d9534f', '#409eff',
-  '#9b59b6', '#1abc9c', '#f39c12', '#7f8c8d', '#c0392b',
-  '#16a085', '#8e44ad'
+  '#6366f1', '#ec4899', '#10b981', '#f59e0b', '#818cf8',
+  '#f472b6', '#34d399', '#fbbf24', '#94a3b8', '#4f46e5',
+  '#a78bfa', '#fb7185'
 ]
