@@ -1,62 +1,61 @@
 <template>
   <el-container class="layout">
-    <el-aside width="210px" class="aside">
-      <div class="logo">
-        <el-icon :size="22"><Wallet /></el-icon>
-        <span>管家婆</span>
-      </div>
-      <el-menu
-        :default-active="activeMenu"
-        class="menu"
-        background-color="#233a30"
-        text-color="#c8d6cf"
-        active-text-color="#ffffff"
-        router
-      >
-        <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债 -->
-        <template v-if="isFamilyUser">
-          <el-menu-item index="/home">
-            <el-icon><DataBoard /></el-icon><span>家庭看板</span>
-          </el-menu-item>
-          <el-menu-item index="/me">
-            <el-icon><Avatar /></el-icon><span>个人看板</span>
-          </el-menu-item>
-          <el-menu-item index="/record">
-            <el-icon><Tickets /></el-icon><span>收支流水</span>
-          </el-menu-item>
-          <el-menu-item index="/import">
-            <el-icon><Upload /></el-icon><span>文件导入</span>
-          </el-menu-item>
-          <el-menu-item index="/stat">
-            <el-icon><PieChart /></el-icon><span>统计报表</span>
-          </el-menu-item>
-          <el-menu-item index="/analysis">
-            <el-icon><MagicStick /></el-icon><span>智能分析</span>
-          </el-menu-item>
-          <el-menu-item index="/dedup">
-            <el-icon><CopyDocument /></el-icon><span>账单查重</span>
-          </el-menu-item>
-          <el-menu-item v-if="isOwner" index="/asset">
-            <el-icon><House /></el-icon><span>资产负债</span>
-          </el-menu-item>
-          <el-menu-item index="/member">
-            <el-icon><User /></el-icon><span>成员与账号</span>
-          </el-menu-item>
-          <el-menu-item index="/category">
-            <el-icon><Menu /></el-icon><span>分类管理</span>
-          </el-menu-item>
-        </template>
+    <el-aside width="220px" class="aside">
+      <div class="aside-inner">
+        <div class="logo">
+          <span class="logo-badge">管</span>
+          <span>管家婆</span>
+        </div>
+        <el-menu
+          :default-active="activeMenu"
+          class="menu"
+          router
+        >
+          <!-- 菜单按角色显示：管理员只有维护相关，普通成员看不到资产负债 -->
+          <template v-if="isFamilyUser">
+            <el-menu-item index="/home">
+              <el-icon><DataBoard /></el-icon><span>家庭看板</span>
+            </el-menu-item>
+            <el-menu-item index="/me">
+              <el-icon><Avatar /></el-icon><span>个人看板</span>
+            </el-menu-item>
+            <el-menu-item index="/record">
+              <el-icon><Tickets /></el-icon><span>收支流水</span>
+            </el-menu-item>
+            <el-menu-item index="/import">
+              <el-icon><Upload /></el-icon><span>文件导入</span>
+            </el-menu-item>
+            <el-menu-item index="/stat">
+              <el-icon><PieChart /></el-icon><span>统计报表</span>
+            </el-menu-item>
+            <el-menu-item index="/analysis">
+              <el-icon><MagicStick /></el-icon><span>智能分析</span>
+            </el-menu-item>
+            <el-menu-item index="/dedup">
+              <el-icon><CopyDocument /></el-icon><span>账单查重</span>
+            </el-menu-item>
+            <el-menu-item v-if="isOwner" index="/asset">
+              <el-icon><House /></el-icon><span>资产负债</span>
+            </el-menu-item>
+            <el-menu-item index="/member">
+              <el-icon><User /></el-icon><span>成员与账号</span>
+            </el-menu-item>
+            <el-menu-item index="/category">
+              <el-icon><Menu /></el-icon><span>分类管理</span>
+            </el-menu-item>
+          </template>
 
-        <el-menu-item v-if="isAdmin" index="/admin">
-          <el-icon><Monitor /></el-icon><span>系统维护</span>
-        </el-menu-item>
-        <el-menu-item index="/log">
-          <el-icon><Document /></el-icon><span>操作日志</span>
-        </el-menu-item>
-      </el-menu>
+          <el-menu-item v-if="isAdmin" index="/admin">
+            <el-icon><Monitor /></el-icon><span>系统维护</span>
+          </el-menu-item>
+          <el-menu-item index="/log">
+            <el-icon><Document /></el-icon><span>操作日志</span>
+          </el-menu-item>
+        </el-menu>
+      </div>
     </el-aside>
 
-    <el-container>
+    <el-container class="right">
       <el-header class="header">
         <div class="crumb">
           <span class="family">{{ user.familyName }}</span>
@@ -69,7 +68,7 @@
             <el-icon><Lock /></el-icon>
             仅显示我（{{ user.memberName || user.realName }}）的数据
           </el-tag>
-          <el-tag v-else-if="isOwner" type="success" size="small" effect="plain" class="scope-tag">
+          <el-tag v-else-if="isOwner" size="small" effect="plain" class="scope-tag scope-owner">
             <el-icon><View /></el-icon>
             户主视角 · 可查看全家数据
           </el-tag>
@@ -119,7 +118,7 @@ const activeMenu = computed(() => (route.path === '/personal' ? '/me' : route.pa
 
 const roleTagType = computed(() => {
   if (user.value.role === ROLE.ADMIN) return 'danger'
-  if (user.value.role === ROLE.OWNER) return 'success'
+  if (user.value.role === ROLE.OWNER) return 'primary'
   return 'info'
 })
 
@@ -158,37 +157,99 @@ async function logoutThisTab() {
 <style scoped>
 .layout {
   height: 100%;
+  background: var(--gjp-bg);
 }
 
 .aside {
-  background: #233a30;
+  background: transparent;
+  overflow: visible;
+  padding: 12px 0 12px 12px;
+}
+
+.aside-inner {
+  height: 100%;
+  background: #fff;
+  border-radius: var(--gjp-radius);
+  box-shadow: var(--gjp-soft-shadow);
   overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .logo {
-  height: 60px;
+  height: 56px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 20px;
-  color: #fff;
+  gap: 10px;
+  padding: 0 20px;
+  color: var(--gjp-text);
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: 2px;
-  background: #1c2f27;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.logo-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--gjp-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .menu {
   border-right: none;
+  background: transparent;
+  padding: 0 10px 16px;
+  flex: 1;
+}
+
+.menu :deep(.el-menu-item) {
+  height: 42px;
+  line-height: 42px;
+  margin: 2px 0;
+  border-radius: var(--gjp-radius-pill);
+  color: #64748b;
+}
+
+.menu :deep(.el-menu-item:hover) {
+  background: #eef2ff !important;
+  color: var(--gjp-primary) !important;
+}
+
+.menu :deep(.el-menu-item.is-active) {
+  background: var(--gjp-primary) !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: 0 10px 24px -6px rgba(79, 70, 229, 0.45);
+}
+
+.menu :deep(.el-menu-item.is-active .el-icon) {
+  color: #fff;
+}
+
+.right {
+  min-width: 0;
+  padding: 12px 12px 12px 0;
 }
 
 .header {
-  height: 60px;
+  height: 56px;
   background: #fff;
-  border-bottom: 1px solid var(--gjp-border);
+  border-bottom: none;
+  border-radius: var(--gjp-radius);
+  box-shadow: var(--gjp-soft-shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 20px;
+  margin-bottom: 12px;
 }
 
 .crumb .family {
@@ -197,7 +258,7 @@ async function logoutThisTab() {
 }
 
 .crumb .page-name {
-  color: var(--gjp-text-light);
+  color: #64748b;
 }
 
 .user-area {
@@ -210,6 +271,13 @@ async function logoutThisTab() {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  border-radius: 999px;
+}
+
+.scope-owner {
+  background: #eef2ff !important;
+  border-color: transparent !important;
+  color: var(--gjp-primary) !important;
 }
 
 .user-name {
@@ -223,10 +291,12 @@ async function logoutThisTab() {
 
 .role-tag {
   margin-left: 2px;
+  border-radius: 999px;
 }
 
 .main {
-  padding: 16px;
+  padding: 0;
   overflow-y: auto;
+  background: transparent;
 }
 </style>

@@ -35,29 +35,29 @@
       </div>
     </div>
 
-    <!-- 指标卡 -->
-    <el-row :gutter="14" class="cards">
+    <!-- 指标卡 Soft UI accents -->
+    <el-row :gutter="16" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="收入合计" :value="ov.totalIncome" color="#21a675"
+        <StatCard label="收入合计" :value="ov.totalIncome" color="#10b981" icon="↑"
                   :sub="`月均 ¥${money(ov.avgMonthlyIncome)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="支出合计" :value="ov.totalExpense" color="#d9534f"
+        <StatCard label="支出合计" :value="ov.totalExpense" color="#ec4899" icon="↓"
                   :sub="`月均 ¥${money(ov.avgMonthlyExpense)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard :label="data.memberId ? '本人结余' : '家庭结余'" :value="ov.balance"
-                  :color="Number(ov.balance) >= 0 ? '#2e7d5b' : '#d9534f'"
+                  :color="Number(ov.balance) >= 0 ? '#f59e0b' : '#ec4899'" icon="≈"
                   :sub="`结余率 ${balanceRate}%`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="流水笔数" :value="ov.recordCount" color="#409eff" prefix="" raw
+        <StatCard label="流水笔数" :value="ov.recordCount" color="#4f46e5" icon="#" prefix="" raw
                   :sub="`单笔最大支出 ¥${money(ov.maxExpense)}`" />
       </el-col>
     </el-row>
 
     <!-- 趋势 + 支出结构 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="16">
         <div class="page-card">
           <h3 class="card-title">收支趋势</h3>
@@ -73,7 +73,7 @@
     </el-row>
 
     <!-- 成员 + 商家 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="12">
         <div class="page-card">
           <h3 class="card-title">
@@ -92,7 +92,7 @@
     </el-row>
 
     <!-- 片区 + 支付方式 + 预算 -->
-    <el-row :gutter="14">
+    <el-row :gutter="16">
       <el-col :md="8">
         <div class="page-card">
           <h3 class="card-title">消费片区分布</h3>
@@ -195,7 +195,7 @@ function budgetTag(status) {
 const trendOption = computed(() => {
   const rows = data.value.trend || []
   return {
-    color: ['#21a675', '#d9534f', '#e6a23c'],
+    color: ['#10b981', '#ec4899', '#f59e0b'],
     tooltip: { trigger: 'axis', valueFormatter: (v) => `¥${money(v)}` },
     legend: { data: ['收入', '支出', '结余'], top: 0 },
     grid: { left: 60, right: 30, top: 40, bottom: 30 },
@@ -262,7 +262,7 @@ const payPieOption = computed(() => pieOption(data.value.payMethod || [], '支�
 const memberBarOption = computed(() => {
   const rows = data.value.memberExpense || []
   return {
-    color: ['#2e7d5b'],
+    color: ['#4f46e5'],
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v) => `¥${money(v)}` },
     grid: { left: 70, right: 110, top: 20, bottom: 30 },
     xAxis: { type: 'value', axisLabel: { formatter: (v) => (v >= 10000 ? v / 10000 + '万' : v) } },
@@ -281,7 +281,7 @@ const memberBarOption = computed(() => {
 const merchantBarOption = computed(() => {
   const rows = data.value.merchantRank || []
   return {
-    color: ['#e6a23c'],
+    color: ['#ec4899'],
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
@@ -310,7 +310,7 @@ const merchantBarOption = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 16px 22px;
   flex-wrap: wrap;
   gap: 10px;
 }
@@ -322,22 +322,45 @@ const merchantBarOption = computed(() => {
   flex-wrap: wrap;
 }
 
+.toolbar :deep(.el-radio-button__inner) {
+  border-radius: 14px !important;
+  border: none !important;
+  box-shadow: 0 1px 3px rgba(148, 163, 184, 0.25);
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.toolbar :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: var(--gjp-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px -6px rgba(79, 70, 229, 0.45);
+}
+
+.toolbar :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-radius: 14px !important;
+}
+
+.toolbar :deep(.el-radio-button:last-child .el-radio-button__inner) {
+  border-radius: 14px !important;
+}
+
 .card-title.inline {
   display: inline-block;
   margin: 0 12px 0 0;
+  font-size: 16px;
 }
 
 .cards {
-  margin: 14px 0 2px;
+  margin: 16px 0 2px;
 }
 
 .cards .el-col {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .el-row + .el-row .page-card,
 .cards + .el-row .page-card {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .budget-card {

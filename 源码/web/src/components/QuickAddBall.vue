@@ -309,20 +309,20 @@ async function onSaveAndClose() {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2e7d5b, #21a675);
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
-  box-shadow: 0 4px 16px rgba(46, 125, 91, 0.4);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
   transition: transform 0.15s, box-shadow 0.15s;
   user-select: none;
 }
 
 .ball:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 22px rgba(46, 125, 91, 0.5);
+  box-shadow: 0 6px 22px rgba(79, 70, 229, 0.5);
 }
 
 .ball.dragging {
@@ -366,8 +366,8 @@ async function onSaveAndClose() {
 .panel {
   position: fixed;
   background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  border-radius: 20px;
+  box-shadow: var(--gjp-soft-shadow, 0 10px 40px -10px rgba(148, 163, 184, 0.35));
   padding: 16px 18px;
 }
 
@@ -396,7 +396,7 @@ async function onSaveAndClose() {
 
 .entry:hover {
   border-color: var(--gjp-primary);
-  background: #f2faf6;
+  background: #eef2ff;
   transform: translateY(-2px);
 }
 

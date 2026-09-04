@@ -1,29 +1,34 @@
-/* 全局样式。配色以"账本"为意象：主色取墨绿，收入用绿、支出用红，符合国内记账习惯。 */
+/* Soft UI / 柔和界面：slate 底、白卡片、indigo 主色（替换原墨绿品牌色） */
 :root {
-  --gjp-primary: #2e7d5b;
-  --gjp-income: #21a675;
-  --gjp-expense: #d9534f;
-  --gjp-bg: #f4f6f5;
-  --gjp-border: #e4e7ed;
-  --gjp-text: #303133;
-  --gjp-text-light: #909399;
+  --gjp-primary: #4f46e5;
+  --gjp-income: #10b981;
+  --gjp-expense: #ec4899;
+  --gjp-balance: #f59e0b;
+  --gjp-bg: #f8fafc;
+  --gjp-border: #e2e8f0;
+  --gjp-text: #1e293b;
+  --gjp-text-light: #94a3b8;
+  --gjp-soft-shadow: 0 10px 40px -10px rgba(148, 163, 184, 0.35);
+  --gjp-radius: 20px;
+  --gjp-radius-sm: 16px;
+  --gjp-radius-pill: 16px;
 }
 
 /* ------------------------------------------------------------
- * 覆盖 Element Plus 主色。
- * 组件库默认主色是蓝色 #409eff，与本项目"账本墨绿"的品牌色不搭，
- * 按钮、标签页、进度条会一片蓝。这里改写组件库的 CSS 变量，
- * 各页面不需要逐个组件写 style，整站配色自然统一。
- * light-3/5/7/8/9 与 dark-2 分别对应 hover、禁用、浅背景等状态，缺一个就会露出蓝色。
+ * 覆盖 Element Plus 主色 → indigo-600 Soft UI
+ * light-3/5/7/8/9 与 dark-2 分别对应 hover、禁用、浅背景等状态
  * ------------------------------------------------------------ */
 :root {
-  --el-color-primary: #2e7d5b;
-  --el-color-primary-light-3: #6da48c;
-  --el-color-primary-light-5: #97bead;
-  --el-color-primary-light-7: #c0d8ce;
-  --el-color-primary-light-8: #d5e5de;
-  --el-color-primary-light-9: #eaf2ee;
-  --el-color-primary-dark-2: #256449;
+  --el-color-primary: #4f46e5;
+  --el-color-primary-light-3: #818cf8;
+  --el-color-primary-light-5: #a5b4fc;
+  --el-color-primary-light-7: #c7d2fe;
+  --el-color-primary-light-8: #e0e7ff;
+  --el-color-primary-light-9: #eef2ff;
+  --el-color-primary-dark-2: #4338ca;
+  --el-border-radius-base: 12px;
+  --el-border-radius-small: 10px;
+  --el-border-radius-round: 20px;
 }
 
 * {
@@ -45,12 +50,13 @@ body {
   font-size: 14px;
 }
 
-/* 页面统一的卡片容器 */
+/* 页面统一的 Soft UI 卡片：大圆角 + 柔和阴影，无硬边框 */
 .page-card {
   background: #fff;
-  border-radius: 6px;
+  border-radius: var(--gjp-radius);
   padding: 18px 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--gjp-soft-shadow);
+  border: none;
 }
 
 .page-card + .page-card {
@@ -63,8 +69,8 @@ body {
   font-weight: 600;
   color: var(--gjp-text);
   margin: 0 0 14px;
-  padding-left: 9px;
-  border-left: 3px solid var(--gjp-primary);
+  padding-left: 0;
+  border-left: none;
   line-height: 18px;
 }
 
@@ -95,4 +101,17 @@ body {
 .chart-box-tall {
   width: 100%;
   height: 380px;
+}
+
+/* Soft UI：圆角按钮/单选组轻触继承 */
+.el-button {
+  --el-border-radius-base: 12px;
+}
+
+.el-radio-button__inner {
+  border-radius: 12px !important;
+}
+
+.el-tag {
+  border-radius: 999px;
 }
