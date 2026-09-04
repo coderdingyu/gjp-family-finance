@@ -10,39 +10,39 @@
 
     <el-row :gutter="14" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="今日支出" :value="data.todayExpense" color="#d9534f"
+        <StatCard label="今日支出" :value="data.todayExpense" color="var(--gjp-expense)"
                   :sub="data.today || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="今日收入" :value="data.todayIncome" color="#21a675"
+        <StatCard label="今日收入" :value="data.todayIncome" color="var(--gjp-income)"
                   :sub="data.today || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="本周支出" :value="data.weekExpense" color="#e6a23c"
+        <StatCard label="本周支出" :value="data.weekExpense" color="var(--gjp-balance)"
                   :sub="'周一至今天'" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="本月支出" :value="data.monthExpense" color="#c0392b"
+        <StatCard label="本月支出" :value="data.monthExpense" color="var(--gjp-expense)"
                   :sub="data.month || ''" />
       </el-col>
     </el-row>
 
     <el-row :gutter="14" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="本月收入合计" :value="data.monthIncome" color="#21a675"
+        <StatCard label="本月收入合计" :value="data.monthIncome" color="var(--gjp-income)"
                   :sub="data.month || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="本月支出合计" :value="data.monthExpense" color="#d9534f"
+        <StatCard label="本月支出合计" :value="data.monthExpense" color="var(--gjp-expense)"
                   :sub="`单笔最大 ¥${money(ov.maxExpense)}`" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard label="本月结余" :value="data.monthBalance"
-                  :color="Number(data.monthBalance) >= 0 ? '#2e7d5b' : '#d9534f'"
+                  :color="Number(data.monthBalance) >= 0 ? 'var(--gjp-balance)' : 'var(--gjp-expense)'"
                   :sub="monthBalanceSub" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="本月笔数" :value="data.monthCount" color="#409eff" prefix="" raw
+        <StatCard label="本月笔数" :value="data.monthCount" color="var(--gjp-count)" prefix="" raw
                   :sub="`人情往来 ¥${money(ov.giftExpense)}`" />
       </el-col>
     </el-row>
@@ -50,20 +50,20 @@
     <div class="section-label">上月情况</div>
     <el-row :gutter="14" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="上月收入" :value="data.lastMonthIncome" color="#21a675"
+        <StatCard label="上月收入" :value="data.lastMonthIncome" color="var(--gjp-income)"
                   :sub="data.lastMonthLabel || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="上月支出" :value="data.lastMonthExpense" color="#d9534f"
+        <StatCard label="上月支出" :value="data.lastMonthExpense" color="var(--gjp-expense)"
                   :sub="data.lastMonthLabel || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard label="上月结余" :value="data.lastMonthBalance"
-                  :color="Number(data.lastMonthBalance) >= 0 ? '#2e7d5b' : '#d9534f'"
+                  :color="Number(data.lastMonthBalance) >= 0 ? 'var(--gjp-balance)' : 'var(--gjp-expense)'"
                   :sub="data.lastMonthLabel || ''" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="上月笔数" :value="data.lastMonthCount" color="#409eff" prefix="" raw
+        <StatCard label="上月笔数" :value="data.lastMonthCount" color="var(--gjp-count)" prefix="" raw
                   :sub="data.lastMonthLabel || ''" />
       </el-col>
     </el-row>
@@ -152,7 +152,7 @@ import { computed, onMounted, ref } from 'vue'
 import EChart from '../../components/EChart.vue'
 import StatCard from '../../components/StatCard.vue'
 import { personalBoard } from '../../api/stat'
-import { CHART_COLORS, money, signedMoney, typeText } from '../../utils/format'
+import { CHART_COLORS, TONE, money, signedMoney, typeText } from '../../utils/format'
 
 const loading = ref(false)
 const data = ref({})
@@ -237,7 +237,7 @@ const lastExpensePieOption = computed(() => pieOption(data.value.lastExpenseCate
 const weekOption = computed(() => {
   const rows = data.value.weekDaily || []
   return {
-    color: ['#d9534f'],
+    color: [TONE.expense],
     tooltip: { trigger: 'axis', valueFormatter: (v) => `¥${money(v)}` },
     grid: { left: 50, right: 20, top: 24, bottom: 30 },
     xAxis: {
@@ -253,7 +253,7 @@ const weekOption = computed(() => {
 const monthSparkOption = computed(() => {
   const rows = data.value.monthDaily || []
   return {
-    color: ['#d9534f'],
+    color: [TONE.expense],
     tooltip: { trigger: 'axis', valueFormatter: (v) => `¥${money(v)}` },
     grid: { left: 50, right: 16, top: 20, bottom: 28 },
     xAxis: {

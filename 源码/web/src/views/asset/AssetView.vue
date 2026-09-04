@@ -3,20 +3,20 @@
     <!-- 净资产总览 -->
     <el-row :gutter="14" class="cards">
       <el-col :md="6" :sm="12">
-        <StatCard label="资产合计" :value="summary.totalAsset" color="#2e7d5b"
+        <StatCard label="资产合计" :value="summary.totalAsset" color="var(--gjp-income)"
                   :sub="`共 ${summary.assetCount || 0} 项资产`" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="贷款剩余本金" :value="summary.totalLoanRemain" color="#d9534f"
+        <StatCard label="贷款剩余本金" :value="summary.totalLoanRemain" color="var(--gjp-expense)"
                   :sub="`共 ${summary.loanCount || 0} 笔贷款`" />
       </el-col>
       <el-col :md="6" :sm="12">
         <StatCard label="净资产" :value="summary.netAsset"
-                  :color="Number(summary.netAsset) >= 0 ? '#21a675' : '#d9534f'"
+                  :color="Number(summary.netAsset) >= 0 ? 'var(--gjp-balance)' : 'var(--gjp-expense)'"
                   sub="净资产 = 资产合计 − 贷款剩余本金" />
       </el-col>
       <el-col :md="6" :sm="12">
-        <StatCard label="每月还款压力" :value="summary.monthlyPayTotal" color="#e6a23c"
+        <StatCard label="每月还款压力" :value="summary.monthlyPayTotal" color="var(--gjp-balance)"
                   sub="在还贷款的月供合计" />
       </el-col>
     </el-row>
