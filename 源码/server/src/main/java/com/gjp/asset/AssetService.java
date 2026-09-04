@@ -1,5 +1,6 @@
 package com.gjp.asset;
 
+import com.gjp.asset.quote.AssetValuationService;
 import com.gjp.common.AppTime;
 import com.gjp.common.BizException;
 import com.gjp.common.UserContext;
@@ -14,7 +15,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -43,12 +43,14 @@ public class AssetService {
     private LoanMapper loanMapper;
     @Autowired
     private OperationLogService logService;
+    @Autowired
+    private AssetValuationService valuationService;
 
     // ---------------- 资产 ----------------
 
-    public List<Asset> listAsset() {
+    public List<AssetVO> listAsset() {
         UserContext.requireOwner();
-        return assetMapper.selectByFamily(UserContext.getFamilyId());
+        return valuationService.enrichAll(assetMapper.selectByFamily(UserContext.getFamilyId()));
     }
 
     public Asset addAsset(Asset asset) {
@@ -104,6 +106,42 @@ public class AssetService {
         if (asset.getBuyDate() != null && asset.getBuyDate().isAfter(AppTime.today())) {
             throw new BizException("取得日期不能晚于今天");
         }
+        if (asset.getShares() != null && asset.getShares().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BizException("持仓数量不能为负数");
+        }
+        if (asset.getAnnualRate() != null && asset.getAnnualRate().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BizException("年利率不能为负数");
+        }
+        if (asset.getTermMonths() != null && asset.getTermMonths() < 0) {
+            throw new BizException("存期不能为负数");
+        }
+        blankToNull(asset);
+    }
+
+    private static void blankToNull(Asset asset) {
+        if (!StringUtils.hasText(asset.getSymbol())) {
+            asset.setSymbol(null);
+        } else {
+            asset.setSymbol(asset.getSymbol().trim());
+        }
+        if (!StringUtils.hasText(asset.getInterestMethod())) {
+            asset.setInterestMethod(null);
+        }
+        if (!StringUtils.hasText(asset.getCarModel())) {
+            asset.setCarModel(null);
+        } else {
+            asset.setCarModel(asset.getCarModel().trim());
+        }
+        if (!StringUtils.hasText(asset.getCity())) {
+            asset.setCity(null);
+        } else {
+            asset.setCity(asset.getCity().trim());
+        }
+        if (!StringUtils.hasText(asset.getCommunity())) {
+            asset.setCommunity(null);
+        } else {
+            asset.setCommunity(asset.getCommunity().trim());
+        }
     }
 
     // ---------------- 贷款 ----------------
@@ -119,16 +157,18 @@ public class AssetService {
             row.put("loanType", loan.getLoanType());
             row.put("totalAmount", loan.getTotalAmount());
             row.put("monthlyPayment", loan.getMonthlyPayment());
+            int paid = LoanProgress.paidMonths(loan);
             row.put("totalMonths", loan.getTotalMonths());
-            row.put("paidMonths", loan.getPaidMonths());
+            row.put("paidMonths", paid);
+            row.put("paidMonthsAuto", LoanProgress.auto(loan));
             row.put("startDate", loan.getStartDate());
             row.put("remainMonths", remainMonths(loan));
             row.put("remainAmount", remainAmount(loan));
             row.put("paidAmount", loan.getMonthlyPayment()
-                    .multiply(BigDecimal.valueOf(loan.getPaidMonths() == null ? 0 : loan.getPaidMonths())));
+                    .multiply(BigDecimal.valueOf(paid)));
             row.put("progress", loan.getTotalMonths() == null || loan.getTotalMonths() == 0
                     ? BigDecimal.ZERO
-                    : BigDecimal.valueOf(loan.getPaidMonths() == null ? 0 : loan.getPaidMonths())
+                    : BigDecimal.valueOf(paid)
                     .multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(loan.getTotalMonths()), 2, RoundingMode.HALF_UP));
             result.add(row);
@@ -138,8 +178,7 @@ public class AssetService {
 
     private int remainMonths(Loan loan) {
         int total = loan.getTotalMonths() == null ? 0 : loan.getTotalMonths();
-        int paid = loan.getPaidMonths() == null ? 0 : loan.getPaidMonths();
-        return Math.max(total - paid, 0);
+        return Math.max(total - LoanProgress.paidMonths(loan), 0);
     }
 
     /**
@@ -224,14 +263,15 @@ public class AssetService {
     public Map<String, Object> summary() {
         UserContext.requireOwner();
         Long familyId = UserContext.getFamilyId();
-        List<Asset> assets = assetMapper.selectByFamily(familyId);
+        List<AssetVO> assets = valuationService.enrichAll(assetMapper.selectByFamily(familyId));
         List<Loan> loans = loanMapper.selectByFamily(familyId);
 
         BigDecimal totalAsset = BigDecimal.ZERO;
         Map<String, BigDecimal> byType = new LinkedHashMap<>();
-        for (Asset a : assets) {
-            totalAsset = totalAsset.add(a.getAmount());
-            byType.merge(a.getAssetType(), a.getAmount(), BigDecimal::add);
+        for (AssetVO a : assets) {
+            BigDecimal v = a.getAmount() == null ? BigDecimal.ZERO : a.getAmount();
+            totalAsset = totalAsset.add(v);
+            byType.merge(a.getAssetType(), v, BigDecimal::add);
         }
 
         BigDecimal totalLoanRemain = BigDecimal.ZERO;
