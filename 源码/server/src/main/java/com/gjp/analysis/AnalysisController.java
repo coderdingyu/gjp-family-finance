@@ -7,9 +7,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,9 +35,15 @@ public class AnalysisController {
         return Result.ok(map);
     }
 
-    /** 分析报告：返回按严重程度排序的结论列表 */
+    /** 先返回本地快照；AI 增强由独立请求显式触发。 */
     @GetMapping("/report")
-    public Result<List<AnalysisItem>> report(@ModelAttribute StatQuery q) {
-        return Result.ok(analysisService.report(q.range(), q.getMemberId()));
+    public Result<AnalysisReport> report(@ModelAttribute StatQuery q, @RequestParam(defaultValue = "false") boolean refresh) {
+        return Result.ok(analysisService.report(q.range(), q.getMemberId(), refresh));
+    }
+
+    public record EnhanceRequest(@NotBlank String reportId) {}
+    @PostMapping("/enhance")
+    public Result<AnalysisReport> enhance(@Valid @RequestBody EnhanceRequest body) {
+        return Result.ok(analysisService.enhance(body.reportId()));
     }
 }

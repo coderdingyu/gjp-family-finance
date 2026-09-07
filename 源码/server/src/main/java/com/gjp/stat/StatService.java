@@ -150,8 +150,9 @@ public class StatService {
 
     /** 商家消费排行 */
     public List<AmountItem> merchantRank(DateRange range, int limit, Long requestedMemberId) {
-        return withRatio(statMapper.selectMerchantRank(UserContext.getFamilyId(),
-                range.getStart(), range.getEnd(), UserContext.resolveMemberId(requestedMemberId), limit));
+        // SQL 窗口汇总先于 LIMIT 执行，分母是全部合格商家，而非榜单小计。
+        return statMapper.selectMerchantRank(UserContext.getFamilyId(),
+                range.getStart(), range.getEnd(), UserContext.resolveMemberId(requestedMemberId), limit);
     }
 
     /** 消费片区分布 */

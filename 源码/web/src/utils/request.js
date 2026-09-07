@@ -54,14 +54,15 @@ request.interceptors.response.use(
     if (res.code === 401) {
       return unauthorized(res.msg, response.config)
     }
-    ElMessage.error(res.msg || '操作失败')
+    if (!response.config.silentError) ElMessage.error(res.msg || '操作失败')
     return Promise.reject(new Error(res.msg))
   },
   (error) => {
+    if (axios.isCancel(error)) return Promise.reject(error)
     if (error.response?.status === 401) {
       return unauthorized(error.response.data?.msg, error.config)
     }
-    ElMessage.error('网络异常，请确认后端服务已启动（http://localhost:8080）')
+    if (!error.config?.silentError) ElMessage.error('网络异常，请确认后端服务已启动（http://localhost:8080）')
     return Promise.reject(error)
   }
 )
