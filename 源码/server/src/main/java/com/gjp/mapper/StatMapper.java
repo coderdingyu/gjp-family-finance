@@ -61,7 +61,8 @@ public interface StatMapper {
     /** 按月汇总收入与支出，收支趋势折线图数据源 */
     @Select("<script>SELECT DATE_FORMAT(r.record_date, '%Y-%m') AS ym, "
             + "       COALESCE(SUM(CASE WHEN r.type = 1 THEN r.amount ELSE 0 END), 0) AS income, "
-            + "       COALESCE(SUM(CASE WHEN r.type = 2 THEN r.amount ELSE 0 END), 0) AS expense "
+            + "       COALESCE(SUM(CASE WHEN r.type = 2 THEN r.amount ELSE 0 END), 0) AS expense, "
+            + "       COUNT(*) AS recordCount, SUM(CASE WHEN r.type = 2 THEN 1 ELSE 0 END) AS expenseCount "
             + "FROM t_record r WHERE r.family_id = #{familyId} "
             + "AND r.record_date BETWEEN #{startDate} AND #{endDate} " + MEMBER_COND
             + " GROUP BY DATE_FORMAT(r.record_date, '%Y-%m') ORDER BY ym</script>")
@@ -137,10 +138,11 @@ public interface StatMapper {
                                       @Param("memberId") Long memberId);
 
     /** 商家消费排行。房租房贷月供（本分类或其下级）不进榜，避免把还款银行当成消费商家 */
-    @Select("<script>SELECT r.merchant AS name, COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count "
+    @Select("<script>SELECT r.merchant AS name, COALESCE(SUM(r.amount), 0) AS amount, COUNT(*) AS count, "
+            + "COALESCE(ROUND(SUM(r.amount) * 100 / NULLIF(SUM(SUM(r.amount)) OVER (), 0), 2), 0) AS ratio "
             + "FROM t_record r "
             + "JOIN t_category c ON r.category_id = c.id "
-            + "LEFT JOIN t_category p ON c.parent_id = p.id "
+            + "LEFT JOIN t_category p ON c.root_id = p.id "
             + "WHERE r.family_id = #{familyId} AND r.type = 2 "
             + "AND r.merchant IS NOT NULL AND r.merchant <![CDATA[<>]]> '' "
             + "AND c.category_name <![CDATA[<>]]> '房租房贷' "

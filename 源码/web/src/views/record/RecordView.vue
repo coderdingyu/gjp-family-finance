@@ -315,8 +315,9 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { parseAnalysisEvidence } from '../../utils/analysisEvidence.mjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { EditPen, RefreshLeft, Search, Upload } from '@element-plus/icons-vue'
 import { addRecord, askRecord, deleteRecord, pageRecord, recordOptions, updateRecord } from '../../api/record'
@@ -326,6 +327,8 @@ import { money, today, typeText } from '../../utils/format'
 import { currentUser, scopeLocked } from '../../utils/auth'
 
 const router = useRouter()
+const route = useRoute()
+let evidenceReady = false
 const loading = ref(false)
 const saving = ref(false)
 const list = ref([])
@@ -422,13 +425,27 @@ onMounted(async () => {
   members.value = await listMember()
   categoryTree.value = await treeCategory()
   options.value = await recordOptions()
+  applyAnalysisEvidence()
   // 普通成员的成员筛选锁死为自己
   if (scopeLocked.value) {
     query.value.memberId = currentUser.value.memberId
   }
   window.addEventListener('gjp:record-changed', onExternalChange)
+  evidenceReady = true
   await load()
 })
+
+function applyAnalysisEvidence() {
+  const evidence = parseAnalysisEvidence(route.query)
+  if (!evidence) return false
+  query.value = { ...emptyQuery(), ...evidence }
+  dateRange.value = [evidence.startDate, evidence.endDate]
+  queryCategory.value = evidence.categoryId ? [evidence.categoryId] : []
+  if (scopeLocked.value) query.value.memberId = currentUser.value.memberId
+  return true
+}
+
+watch(() => route.query, () => { if (evidenceReady && applyAnalysisEvidence()) load() })
 
 onBeforeUnmount(() => window.removeEventListener('gjp:record-changed', onExternalChange))
 

@@ -19,6 +19,14 @@ public class MonthAmount {
     /** 当月结余 = 收入 - 支出，由 Service 计算 */
     private BigDecimal balance;
 
+    private int recordCount;
+    private int expenseCount;
+
+    public int getRecordCount() { return recordCount; }
+    public void setRecordCount(int value) { recordCount = value; }
+    public int getExpenseCount() { return expenseCount; }
+    public void setExpenseCount(int value) { expenseCount = value; }
+
     public String getYm() {
         return ym;
     }

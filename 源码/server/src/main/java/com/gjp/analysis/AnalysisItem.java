@@ -8,6 +8,20 @@ package com.gjp.analysis;
  */
 public class AnalysisItem {
 
+    private String findingId;
+    private java.util.Map<String, Object> metrics = new java.util.LinkedHashMap<>();
+    private java.util.Map<String, String> recordFilters = new java.util.LinkedHashMap<>();
+    private java.util.List<String> evidenceIds = new java.util.ArrayList<>();
+
+    public String getFindingId() { return findingId == null ? code : findingId; }
+    public void setFindingId(String value) { findingId = value; }
+    public java.util.Map<String, Object> getMetrics() { return metrics; }
+    public void setMetrics(java.util.Map<String, Object> value) { metrics = value; }
+    public java.util.Map<String, String> getRecordFilters() { return recordFilters; }
+    public void setRecordFilters(java.util.Map<String, String> value) { recordFilters = value; }
+    public java.util.List<String> getEvidenceIds() { return evidenceIds; }
+    public void setEvidenceIds(java.util.List<String> value) { evidenceIds = value; }
+
     /** 规则编号，便于测试用例逐条对照，如 A1、A2 */
     private String code;
     /** 严重程度：danger=需要立刻关注 warning=需留意 info=中性提示 good=表现良好 */
