@@ -591,17 +591,19 @@ function itemTag(row) {
 
 .dropzone {
   position: relative;
-  border: 1px dashed #c3d4c8;
-  border-radius: 8px;
-  background: #f7faf8;
+  border: 1.5px dashed var(--gjp-border);
+  border-radius: var(--gjp-radius-sm, 16px);
+  background: var(--gjp-summary-bg, #f1f5f9);
   padding: 36px 20px 28px;
   text-align: center;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .dropzone.is-over {
-  border-color: #3d8b5e;
-  background: #eef6f0;
+  border-color: var(--gjp-primary);
+  background: var(--gjp-menu-hover-bg);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 
 .dropzone.is-disabled {
@@ -622,23 +624,25 @@ function itemTag(row) {
 }
 
 .drop-icon {
-  color: #7a8f80;
+  color: var(--gjp-primary);
+  opacity: 0.85;
 }
 
 .drop-title {
   margin-top: 8px;
-  color: #3c4a42;
+  color: var(--gjp-text);
 }
 
 .drop-title em {
   font-style: normal;
-  color: #2f7d4f;
+  color: var(--gjp-primary);
+  font-weight: 600;
 }
 
 .drop-tip {
   margin-top: 8px;
   font-size: 12px;
-  color: #7a8f80;
+  color: var(--gjp-text-muted);
   line-height: 1.7;
 }
 
@@ -655,9 +659,11 @@ function itemTag(row) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  background: #f8faf9;
-  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--gjp-summary-bg, #f1f5f9);
+  border: 1px solid var(--gjp-border);
+  border-radius: 12px;
+  color: var(--gjp-text);
 }
 
 .picked-name {
@@ -666,10 +672,11 @@ function itemTag(row) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--gjp-text);
 }
 
 .picked-size {
-  color: #7a8f80;
+  color: var(--gjp-text-muted);
   font-size: 12px;
 }
 
@@ -698,8 +705,10 @@ function itemTag(row) {
 
 .file-row {
   padding: 10px 12px;
-  background: #f8faf9;
-  border-radius: 6px;
+  background: var(--gjp-summary-bg, #f1f5f9);
+  border: 1px solid var(--gjp-border);
+  border-radius: 12px;
+  color: var(--gjp-text);
 }
 
 .file-name {
@@ -708,6 +717,7 @@ function itemTag(row) {
   gap: 8px;
   margin-bottom: 6px;
   flex-wrap: wrap;
+  color: var(--gjp-text);
 }
 
 .reason {
@@ -719,14 +729,14 @@ function itemTag(row) {
 }
 
 .import-mode fieldset {
-  border: 1px solid #d8e4dc;
-  border-radius: 8px;
+  border: 1px solid var(--gjp-border);
+  border-radius: 12px;
   padding: 10px 14px 12px;
 }
 
 .import-mode legend {
   padding: 0 6px;
-  color: #5b6b62;
+  color: var(--gjp-text-muted);
   font-size: 13px;
 }
 
@@ -746,16 +756,23 @@ function itemTag(row) {
 }
 
 .job-item {
-  padding: 10px 12px;
-  background: #f8faf9;
-  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--gjp-summary-bg, #f1f5f9);
+  border-radius: 14px;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 1px solid var(--gjp-border);
+  color: var(--gjp-text);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.job-item:hover {
+  border-color: rgba(79, 70, 229, 0.35);
 }
 
 .job-item.active {
-  border-color: #3d8b5e;
-  background: #eef6f0;
+  border-color: var(--gjp-primary);
+  background: var(--gjp-menu-hover-bg);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.12);
 }
 
 .job-item-main {
@@ -763,10 +780,67 @@ function itemTag(row) {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  color: var(--gjp-text);
 }
 
 .job-item-msg {
   margin-top: 4px;
   font-size: 12px;
+}
+</style>
+
+<style>
+/* Dark theme — unscoped (avoid Vue scoped :global(html.dark) .x compiling to bare html.dark) */
+html.dark .dropzone {
+  background: #334155 !important;
+  border-color: #64748b !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+html.dark .dropzone.is-over {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+html.dark .drop-icon {
+  color: #a5b4fc !important;
+  opacity: 1;
+}
+html.dark .drop-title {
+  color: #f1f5f9 !important;
+}
+html.dark .drop-title em {
+  color: #a5b4fc !important;
+}
+html.dark .drop-tip {
+  color: #cbd5e1 !important;
+}
+html.dark .picked-list li,
+html.dark .file-row,
+html.dark .job-item {
+  background: #334155 !important;
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+html.dark .job-item:hover {
+  border-color: #818cf8 !important;
+}
+html.dark .job-item.active {
+  background: rgba(99, 102, 241, 0.22) !important;
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.25);
+}
+html.dark .picked-name,
+html.dark .file-name,
+html.dark .job-item-main {
+  color: #f8fafc !important;
+}
+html.dark .picked-size {
+  color: #94a3b8 !important;
+}
+html.dark .import-mode fieldset {
+  border-color: #475569 !important;
+}
+html.dark .import-mode legend {
+  color: #cbd5e1 !important;
 }
 </style>

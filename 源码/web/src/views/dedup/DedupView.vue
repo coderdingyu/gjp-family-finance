@@ -226,10 +226,11 @@ async function onDeleteOne(row) {
   align-items: center;
   flex-wrap: wrap;
   padding: 10px 14px;
-  background: #fdf6ec;
-  border-radius: 4px;
+  background: var(--gjp-summary-bg, #fdf6ec);
+  border: 1px solid var(--gjp-border);
+  border-radius: 12px;
   font-size: 13px;
-  color: var(--gjp-text-light);
+  color: var(--gjp-text-muted);
 }
 
 .summary b {

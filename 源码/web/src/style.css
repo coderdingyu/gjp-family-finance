@@ -5,13 +5,44 @@
   --gjp-expense: #ec4899;
   --gjp-balance: #f59e0b;
   --gjp-bg: #f8fafc;
+  --gjp-surface: #ffffff;
+  --gjp-card: #ffffff;
   --gjp-border: #e2e8f0;
   --gjp-text: #1e293b;
+  --gjp-text-muted: #64748b;
   --gjp-text-light: #94a3b8;
   --gjp-soft-shadow: 0 10px 40px -10px rgba(148, 163, 184, 0.35);
   --gjp-radius: 20px;
   --gjp-radius-sm: 16px;
   --gjp-radius-pill: 16px;
+  --gjp-menu-hover-bg: #eef2ff;
+  --gjp-scope-owner-bg: #eef2ff;
+  --gjp-chart-text: #64748b;
+  --gjp-chart-split: rgba(148, 163, 184, 0.35);
+  --gjp-summary-bg: #f1f5f9;
+}
+
+/* Night / dark Soft UI tokens */
+html.dark,
+[data-theme="dark"] {
+  --gjp-primary: #818cf8;
+  --gjp-income: #34d399;
+  --gjp-expense: #f472b6;
+  --gjp-balance: #fbbf24;
+  --gjp-bg: #0f172a;
+  --gjp-surface: #1e293b;
+  --gjp-card: #1e293b;
+  --gjp-border: #334155;
+  --gjp-text: #f8fafc;
+  --gjp-text-muted: #cbd5e1;
+  --gjp-text-light: #94a3b8;
+  --gjp-soft-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.55);
+  --gjp-menu-hover-bg: rgba(99, 102, 241, 0.15);
+  --gjp-scope-owner-bg: rgba(99, 102, 241, 0.18);
+  --gjp-chart-text: #cbd5e1;
+  --gjp-chart-split: rgba(148, 163, 184, 0.22);
+  --gjp-summary-bg: #0f172a;
+  color-scheme: dark;
 }
 
 /* ------------------------------------------------------------
@@ -31,6 +62,46 @@
   --el-border-radius-round: 20px;
 }
 
+html.dark {
+  --el-color-primary: #818cf8;
+  --el-color-primary-light-3: #a5b4fc;
+  --el-color-primary-light-5: #c7d2fe;
+  --el-color-primary-light-7: #4338ca;
+  --el-color-primary-light-8: #3730a3;
+  --el-color-primary-light-9: #312e81;
+  --el-color-primary-dark-2: #6366f1;
+  --el-color-danger: #f87171;
+  --el-color-danger-light-3: #fca5a5;
+  --el-color-danger-light-5: #fecaca;
+  --el-color-danger-light-7: #7f1d1d;
+  --el-color-danger-light-8: #991b1b;
+  --el-color-danger-light-9: #450a0a;
+  --el-color-danger-dark-2: #ef4444;
+  --el-color-success: #34d399;
+  --el-color-warning: #fbbf24;
+  --el-bg-color: var(--gjp-surface);
+  --el-bg-color-page: var(--gjp-bg);
+  --el-bg-color-overlay: #1e293b;
+  --el-text-color-primary: var(--gjp-text);
+  --el-text-color-regular: #e2e8f0;
+  --el-text-color-secondary: var(--gjp-text-muted);
+  --el-text-color-placeholder: #94a3b8;
+  --el-border-color: var(--gjp-border);
+  --el-border-color-light: #334155;
+  --el-border-color-lighter: #475569;
+  --el-border-color-extra-light: #475569;
+  --el-fill-color: #334155;
+  --el-fill-color-light: #1e293b;
+  --el-fill-color-lighter: #1e293b;
+  --el-fill-color-blank: #0f172a;
+  --el-fill-color-dark: #475569;
+  --el-disabled-bg-color: #1e293b;
+  --el-disabled-text-color: #64748b;
+  --el-mask-color: rgba(15, 23, 42, 0.7);
+  --el-box-shadow: var(--gjp-soft-shadow);
+  --el-box-shadow-light: var(--gjp-soft-shadow);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -48,19 +119,42 @@ body {
   background: var(--gjp-bg);
   color: var(--gjp-text);
   font-size: 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* 页面统一的 Soft UI 卡片：大圆角 + 柔和阴影，无硬边框 */
-.page-card {
-  background: #fff;
+.page-card,
+.soft-card,
+.stat-card {
+  background: var(--gjp-card);
   border-radius: var(--gjp-radius);
-  padding: 18px 20px;
   box-shadow: var(--gjp-soft-shadow);
   border: none;
+  color: var(--gjp-text);
+}
+
+.page-card,
+.soft-card {
+  padding: 18px 20px;
 }
 
 .page-card + .page-card {
   margin-top: 16px;
+}
+
+/* Element Plus Card 跟随 Soft UI 表面色 */
+.el-card {
+  --el-card-bg-color: var(--gjp-card);
+  background: var(--gjp-card) !important;
+  color: var(--gjp-text);
+  border: none;
+  border-radius: var(--gjp-radius);
+  box-shadow: var(--gjp-soft-shadow);
+}
+
+.el-card__header,
+.el-card__body {
+  color: var(--gjp-text);
 }
 
 /* 卡片小标题 */
@@ -114,4 +208,97 @@ body {
 
 .el-tag {
   border-radius: 999px;
+}
+
+/* ---- Dark: 表单可读性（placeholder / 值 / 边框） ---- */
+html.dark .el-input__wrapper,
+html.dark .el-textarea__inner,
+html.dark .el-select__wrapper,
+html.dark .el-date-editor.el-input__wrapper {
+  background-color: var(--el-fill-color-blank) !important;
+  box-shadow: 0 0 0 1px var(--gjp-border) inset !important;
+}
+
+html.dark .el-input__inner,
+html.dark .el-textarea__inner,
+html.dark .el-select__selected-item,
+html.dark .el-select__placeholder,
+html.dark .el-range-input,
+html.dark .el-range-separator {
+  color: var(--gjp-text) !important;
+}
+
+html.dark .el-input__inner::placeholder,
+html.dark .el-textarea__inner::placeholder,
+html.dark .el-select__placeholder,
+html.dark .el-range-input::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8;
+}
+
+html.dark .el-form-item__label {
+  color: var(--gjp-text-muted) !important;
+}
+
+/* ---- Dark: 禁用主按钮可读性（EP primary disabled = white on light-5 淡紫，夜色不可读） ---- */
+html.dark .el-button--primary.is-disabled,
+html.dark .el-button--primary.is-disabled:hover,
+html.dark .el-button--primary.is-disabled:focus,
+html.dark .el-button--primary.is-disabled:active,
+html.dark .el-button--primary[disabled],
+html.dark .el-button--primary[disabled]:hover {
+  --el-button-disabled-text-color: #94a3b8;
+  --el-button-disabled-bg-color: #334155;
+  --el-button-disabled-border-color: #475569;
+  color: #94a3b8 !important;
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  opacity: 1;
+}
+
+html.dark .el-button--primary.is-disabled .el-icon,
+html.dark .el-button--primary[disabled] .el-icon {
+  color: #94a3b8 !important;
+}
+
+/* ---- Dark: 表格金额 / 链接对比度 ---- */
+html.dark .el-button.is-link.el-button--primary,
+html.dark .el-button.is-link.el-button--primary:hover {
+  color: #a5b4fc !important;
+}
+
+html.dark .el-button.is-link.el-button--danger,
+html.dark .el-button.is-link.el-button--danger:hover {
+  color: #f87171 !important;
+}
+
+html.dark .el-link.el-link--primary {
+  --el-link-text-color: #a5b4fc;
+  --el-link-hover-text-color: #c7d2fe;
+}
+
+html.dark .el-link.el-link--danger {
+  --el-link-text-color: #f87171;
+  --el-link-hover-text-color: #fca5a5;
+}
+
+html.dark .amount-expense {
+  color: #fb7185;
+}
+
+html.dark .amount-income {
+  color: #34d399;
+}
+
+html.dark .el-table {
+  --el-table-tr-bg-color: var(--gjp-surface);
+  --el-table-header-bg-color: #162032;
+  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.12);
+  --el-table-border-color: var(--gjp-border);
+  --el-table-text-color: var(--gjp-text);
+  --el-table-header-text-color: var(--gjp-text-muted);
+}
+
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #162032;
 }

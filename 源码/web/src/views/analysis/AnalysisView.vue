@@ -170,10 +170,11 @@ function isS0(item) {
 
 .item {
   border-left: 4px solid;
-  border-radius: 4px;
+  border-radius: 12px;
   padding: 13px 16px;
   margin-bottom: 12px;
-  background: #fafafa;
+  background: var(--gjp-summary-bg, #fafafa);
+  color: var(--gjp-text);
 }
 
 .item.danger {
@@ -219,6 +220,7 @@ function isS0(item) {
   color: #1c8f63;
 }
 
+
 .item.verdict {
   border-left-width: 6px;
   box-shadow: 0 2px 10px rgba(46, 125, 91, 0.14);
@@ -263,5 +265,49 @@ function isS0(item) {
 .content {
   color: var(--gjp-text);
   font-size: 13px;
+  line-height: 1.7;
+}
+</style>
+
+<style>
+/* Dark theme — unscoped so selectors compile as html.dark .item (not bare html.dark) */
+html.dark .item {
+  background: #1e293b !important;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.8);
+  color: var(--gjp-text, #e2e8f0);
+}
+html.dark .item.danger {
+  border-color: #f87171 !important;
+  background: rgba(248, 113, 113, 0.12) !important;
+}
+html.dark .item.warning {
+  border-color: #fbbf24 !important;
+  background: rgba(251, 191, 36, 0.12) !important;
+}
+html.dark .item.info {
+  border-color: #60a5fa !important;
+  background: rgba(96, 165, 250, 0.12) !important;
+}
+html.dark .item.good {
+  border-color: #34d399 !important;
+  background: rgba(52, 211, 153, 0.12) !important;
+}
+html.dark .item.danger .item-head {
+  color: #f87171 !important;
+}
+html.dark .item.warning .item-head {
+  color: #fbbf24 !important;
+}
+html.dark .item.info .item-head {
+  color: #60a5fa !important;
+}
+html.dark .item.good .item-head {
+  color: #34d399 !important;
+}
+html.dark .item .content {
+  color: #e2e8f0 !important;
+}
+html.dark .item .title {
+  color: inherit;
 }
 </style>

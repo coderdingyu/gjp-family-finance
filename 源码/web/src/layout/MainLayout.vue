@@ -73,6 +73,16 @@
             户主视角 · 可查看全家数据
           </el-tag>
 
+          <button
+            type="button"
+            class="theme-toggle"
+            :title="isDark ? '切换日间模式' : '切换夜间模式'"
+            :aria-label="isDark ? '切换日间模式' : '切换夜间模式'"
+            @click="onToggleTheme"
+          >
+            <el-icon :size="18"><Moon v-if="!isDark" /><Sunny v-else /></el-icon>
+          </button>
+
           <el-dropdown @command="onCommand">
             <span class="user-name">
               <el-icon><UserFilled /></el-icon>
@@ -103,18 +113,28 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { logout as doLogout } from '../api/auth'
 import QuickAddBall from '../components/QuickAddBall.vue'
 import { currentUser, isAdmin, isFamilyUser, isOwner, scopeLocked, ROLE } from '../utils/auth'
 import { resetTabIdentity } from '../utils/authSession'
+import { getStoredTheme, toggleTheme } from '../utils/theme'
 
 const route = useRoute()
 
 const user = currentUser
+const isDark = ref(getStoredTheme() === 'dark')
 const activeMenu = computed(() => (route.path === '/personal' ? '/me' : route.path))
+
+function onToggleTheme() {
+  isDark.value = toggleTheme() === 'dark'
+}
+
+onMounted(() => {
+  isDark.value = document.documentElement.classList.contains('dark')
+})
 
 const roleTagType = computed(() => {
   if (user.value.role === ROLE.ADMIN) return 'danger'
@@ -163,12 +183,13 @@ async function logoutThisTab() {
 .aside {
   background: transparent;
   overflow: visible;
-  padding: 12px 0 12px 12px;
+  /* 右侧留出与主内容的呼吸间距（总间隙约 20px） */
+  padding: 12px 0 12px 16px;
 }
 
 .aside-inner {
   height: 100%;
-  background: #fff;
+  background: var(--gjp-surface);
   border-radius: var(--gjp-radius);
   box-shadow: var(--gjp-soft-shadow);
   overflow-x: hidden;
@@ -194,7 +215,7 @@ async function logoutThisTab() {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(79, 70, 229, 0.1);
+  background: rgba(79, 70, 229, 0.12);
   color: var(--gjp-primary);
   display: inline-flex;
   align-items: center;
@@ -215,16 +236,16 @@ async function logoutThisTab() {
   line-height: 42px;
   margin: 2px 0;
   border-radius: var(--gjp-radius-pill);
-  color: #64748b;
+  color: var(--gjp-text-muted);
 }
 
 .menu :deep(.el-menu-item:hover) {
-  background: #eef2ff !important;
+  background: var(--gjp-menu-hover-bg) !important;
   color: var(--gjp-primary) !important;
 }
 
 .menu :deep(.el-menu-item.is-active) {
-  background: var(--gjp-primary) !important;
+  background: #4f46e5 !important;
   color: #fff !important;
   font-weight: 500;
   box-shadow: 0 10px 24px -6px rgba(79, 70, 229, 0.45);
@@ -236,12 +257,13 @@ async function logoutThisTab() {
 
 .right {
   min-width: 0;
-  padding: 12px 12px 12px 0;
+  /* 左侧 20px：侧栏圆角卡片与主区卡片之间的清晰间隙 */
+  padding: 12px 16px 12px 20px;
 }
 
 .header {
   height: 56px;
-  background: #fff;
+  background: var(--gjp-surface);
   border-bottom: none;
   border-radius: var(--gjp-radius);
   box-shadow: var(--gjp-soft-shadow);
@@ -258,13 +280,32 @@ async function logoutThisTab() {
 }
 
 .crumb .page-name {
-  color: #64748b;
+  color: var(--gjp-text-muted);
 }
 
 .user-area {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: var(--gjp-menu-hover-bg);
+  color: var(--gjp-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  background: rgba(79, 70, 229, 0.18);
 }
 
 .scope-tag {
@@ -275,7 +316,7 @@ async function logoutThisTab() {
 }
 
 .scope-owner {
-  background: #eef2ff !important;
+  background: var(--gjp-scope-owner-bg) !important;
   border-color: transparent !important;
   color: var(--gjp-primary) !important;
 }

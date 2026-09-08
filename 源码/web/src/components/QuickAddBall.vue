@@ -365,7 +365,7 @@ async function onSaveAndClose() {
 
 .panel {
   position: fixed;
-  background: #fff;
+  background: var(--gjp-card, #fff);
   border-radius: 20px;
   box-shadow: var(--gjp-soft-shadow, 0 10px 40px -10px rgba(148, 163, 184, 0.35));
   padding: 16px 18px;
@@ -407,7 +407,7 @@ async function onSaveAndClose() {
 
 .entry.disabled:hover {
   border-color: var(--gjp-border);
-  background: #fafafa;
+  background: var(--gjp-bg, #fafafa);
   transform: none;
 }
 

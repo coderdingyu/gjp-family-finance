@@ -615,8 +615,8 @@ async function onDelete(row) {
 .ask-answer {
   margin-top: 8px;
   padding: 8px 12px;
-  background: #f2faf6;
-  border-radius: 4px;
+  background: var(--gjp-summary-bg, #f2faf6);
+  border-radius: 8px;
   color: var(--gjp-text);
   line-height: 1.7;
   font-size: 13px;
@@ -635,10 +635,11 @@ async function onDelete(row) {
   flex-wrap: wrap;
   padding: 10px 14px;
   margin-bottom: 12px;
-  background: #f6f8f7;
-  border-radius: 4px;
+  background: var(--gjp-summary-bg, #f1f5f9);
+  border-radius: 12px;
   font-size: 13px;
-  color: var(--gjp-text-light);
+  color: var(--gjp-text-muted);
+  border: 1px solid var(--gjp-border);
 }
 
 .summary b {

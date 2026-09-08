@@ -326,8 +326,8 @@ const merchantBarOption = computed(() => {
   border-radius: 14px !important;
   border: none !important;
   box-shadow: 0 1px 3px rgba(148, 163, 184, 0.25);
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--gjp-bg);
+  color: var(--gjp-text-muted);
 }
 
 .toolbar :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {

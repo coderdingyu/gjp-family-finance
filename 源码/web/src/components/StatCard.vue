@@ -15,7 +15,7 @@
 import { computed } from 'vue'
 import { money } from '../utils/format'
 
-/** 看板顶部的指标卡。Soft UI：圆形色调图标徽章 + 柔和阴影白卡片。 */
+/** 看板顶部的指标卡。Soft UI：圆形色调图标徽章 + 柔和阴影卡片（跟随 --gjp-card）。 */
 const props = defineProps({
   label: String,
   value: [Number, String],
@@ -48,11 +48,12 @@ function hexToRgba(hex, alpha) {
 
 <style scoped>
 .stat-card {
-  background: #fff;
+  background: var(--gjp-card, var(--gjp-surface, #fff));
   border-radius: var(--gjp-radius, 20px);
   padding: 20px 22px;
   box-shadow: var(--gjp-soft-shadow, 0 10px 40px -10px rgba(148, 163, 184, 0.35));
   border: none;
+  color: var(--gjp-text);
 }
 
 .head {
@@ -75,7 +76,7 @@ function hexToRgba(hex, alpha) {
 
 .label {
   font-size: 12px;
-  color: var(--gjp-text-light);
+  color: var(--gjp-text-muted, var(--gjp-text-light));
 }
 
 .value {
